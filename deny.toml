@@ -47,10 +47,14 @@ license-files = [
 ]
 
 # ----------------------------------------------------------------------------
-# bans — pin against duplicate-crate bloat and known-bad crates
+# bans — pin against wildcard deps and known-bad crates.
+# Multiple-versions is allowed: the dependency graph (axum/reqwest/hyper/tokio
+# ecosystem) routinely pulls 2× of small utility crates such as winnow,
+# hashbrown, and getrandom. We track these via `cargo tree --duplicates`
+# locally rather than failing CI on natural ecosystem churn.
 # ----------------------------------------------------------------------------
 [bans]
-multiple-versions = "warn"
+multiple-versions = "allow"
 wildcards = "deny"
 highlight = "all"
 deny = []
