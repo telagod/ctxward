@@ -1,0 +1,52 @@
+services:
+  ctxward:
+    build:
+      context: .
+      args:
+        VERSION: "0.0.0-local"
+        VCS_REF: "local"
+    image: ctxward:local
+    container_name: ctxward
+    read_only: true
+    tmpfs:
+      - /tmp
+    ports:
+      - "8080:8080"
+    environment:
+      CONTEXT_GURD_CONFIG: /app/config.yaml
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-dummy}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - ./config/example.yaml:/app/config.yaml:ro
+      - ./audit.log:/app/audit.log
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--tries=1", "--timeout=2", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      opa:
+        condition: service_started
+
+  opa:
+    image: openpolicyagent/opa:1.4.2-static
+    container_name: ctxward-opa
+    read_only: true
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "/policies/privacy.rego"
+    ports:
+      - "8181:8181"
+    volumes:
+      - ./opa:/policies:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

@@ -1,0 +1,49 @@
+[package]
+name = "context-gurd"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Ctxward — a lightweight Rust privacy gateway for LLM traffic. Detection, redaction, reversible tokenization, review queue, OPA + Presidio integration."
+readme = "README.md"
+repository = "https://github.com/OWNER/ctxward"
+homepage = "https://github.com/OWNER/ctxward"
+keywords = ["llm", "privacy", "gateway", "redaction", "openai"]
+categories = ["web-programming::http-server", "command-line-utilities"]
+rust-version = "1.85"
+
+[dependencies]
+aes-gcm-siv = "0.11"
+async-stream = "0.3"
+axum = { version = "0.8", features = ["json", "macros"] }
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+futures-util = "0.3"
+hex = "0.4"
+http = "1"
+lopdf = "0.38"
+parking_lot = "0.12"
+pdf-extract = "0.10"
+prometheus = "0.13"
+quick-xml = "0.40"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["http2", "json", "rustls-tls", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+sha2 = "0.10"
+subtle = "2"
+thiserror = "2"
+tokio = { version = "1", features = ["full"] }
+toml = "0.9"
+tower-http = { version = "0.6", features = ["request-id", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+zip = { version = "0.6", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tempfile = "3"
+tower = { version = "0.5", features = ["util"] }

@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Rust tests
+        run: make test
+
+      - name: Clippy
+        run: make clippy
+
+      - name: Bench gate smoke fixtures
+        run: |
+          make smoke-bench-gate
+          make smoke-bench-drift
+
+  bench:
+    name: bench
+    runs-on: ubuntu-latest
+    needs: verify
+    concurrency:
+      group: context-gurd-bench-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run bench matrix + gate serially
+        run: make bench-ci
+
+      - name: Upload bench artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-matrix-${{ github.run_id }}
+          path: .tmp-smoke/bench-matrix
+          if-no-files-found: warn

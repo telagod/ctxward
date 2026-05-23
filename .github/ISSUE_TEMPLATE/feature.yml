@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose new functionality or an enhancement.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem you're trying to solve
+      description: What's the underlying need? Who is affected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: API surface, config changes, expected behavior. Sketch is fine.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Affected surface
+      multiple: true
+      options:
+        - Detection / redaction
+        - Tokenization
+        - Review queue
+        - Attachments (multipart / OOXML / PDF)
+        - SSE / streaming
+        - OPA integration
+        - Presidio integration
+        - Admin API / console
+        - Observability (metrics / logs / traces)
+        - Config / deployment
+        - Documentation
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene
+      options:
+        - label: I have searched existing issues and discussions.
+          required: true

@@ -1,0 +1,61 @@
+[Unit]
+Description=Ctxward — privacy gateway for LLM traffic
+Documentation=https://github.com/OWNER/ctxward
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ctxward
+Group=ctxward
+ExecStart=/usr/local/bin/ctxward --config /etc/ctxward/config.yaml
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=10
+
+# --- Environment ---
+# Use systemd EnvironmentFile to inject secrets (OPENAI_API_KEY, tokenization key).
+# Keep file mode 0600 owned by root:ctxward.
+EnvironmentFile=-/etc/ctxward/ctxward.env
+Environment=RUST_LOG=info
+Environment=CONTEXT_GURD_CONFIG=/etc/ctxward/config.yaml
+
+# --- Logs ---
+StandardOutput=journal
+StandardError=journal
+
+# --- Resource limits (tune for traffic) ---
+LimitNOFILE=1048576
+
+# --- Sandboxing ---
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @mount @obsolete
+
+# Allow writing to audit/review log paths only.
+ReadWritePaths=/var/lib/ctxward
+ReadOnlyPaths=/etc/ctxward
+
+# --- Capabilities ---
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

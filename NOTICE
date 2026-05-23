@@ -1,0 +1,9 @@
+Ctxward
+Copyright 2026 The Ctxward Contributors
+
+This product includes software developed by the Ctxward project and its contributors.
+
+Licensed under the MIT License — see LICENSE for details.
+
+This product depends on third-party Rust crates. Each crate retains its own
+license; the aggregated SBOM published with each release enumerates them.

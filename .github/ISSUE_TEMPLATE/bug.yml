@@ -1,0 +1,64 @@
+name: Bug report
+description: Something isn't working as documented.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. **Do not** include raw secrets, raw PII, or production audit log fragments. Redact before pasting.
+
+  - type: input
+    id: version
+    attributes:
+      label: Ctxward version / commit
+      placeholder: "0.1.0 or commit SHA"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - cargo run from source
+        - prebuilt binary (cargo-dist)
+        - container image (GHCR)
+        - Helm chart
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproducer
+      description: Config snippet (redacted) + the exact `curl` or smoke command.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Observed behavior
+      description: Include relevant log lines, status codes, and `/metrics` deltas if available.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Hygiene
+      options:
+        - label: I confirm this report contains no raw secrets or raw PII.
+          required: true
+        - label: I have searched existing issues.
+          required: true

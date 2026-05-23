@@ -1,0 +1,41 @@
+# --- Build artifacts ---
+/target
+/dist
+
+# --- Logs (root-level smoke logs) ---
+*.log
+
+# --- Smoke test workspace ---
+/.tmp-smoke
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# --- Tooling-local metadata (not for the repo) ---
+.ace-tool/
+.claude/
+
+# --- Python (scripts/) ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# --- Coverage / tooling ---
+*.profraw
+lcov.info
+coverage/
+
+# --- Local bench / benchmark scratch ---
+/.tmp-bench

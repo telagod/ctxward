@@ -1,0 +1,2767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Context Gurd · Control Plane</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg-base: #07111f;
+        --bg-accent: #0d1c31;
+        --bg-sheen: rgba(122, 162, 255, 0.18);
+        --glass-bg: rgba(9, 18, 34, 0.76);
+        --glass-bg-light: rgba(17, 30, 54, 0.58);
+        --glass-border: 1px solid rgba(173, 192, 255, 0.16);
+        --glass-shadow: 0 26px 80px rgba(2, 10, 24, 0.46);
+        --glass-shadow-soft: 0 14px 36px rgba(2, 10, 24, 0.28);
+        --glass-blur: blur(18px);
+        --text-main: #edf4ff;
+        --text-soft: rgba(230, 238, 255, 0.72);
+        --text-dim: rgba(214, 225, 255, 0.54);
+        --line-soft: rgba(173, 192, 255, 0.12);
+        --accent: #8fb4ff;
+        --accent-strong: #c6dcff;
+        --good: #74d7a7;
+        --warn: #f6c56b;
+        --bad: #ff8d8d;
+        --chip: rgba(255, 255, 255, 0.08);
+        --radius-lg: 28px;
+        --radius-md: 18px;
+        --radius-sm: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 12% 18%, rgba(108, 148, 255, 0.24), transparent 30%),
+          radial-gradient(circle at 86% 12%, rgba(115, 215, 255, 0.18), transparent 26%),
+          linear-gradient(160deg, var(--bg-base), #050b15 48%, var(--bg-accent));
+        color: var(--text-main);
+        font-family: "Avenir Next", "Segoe UI Variable", "Trebuchet MS", sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 38px 38px;
+        mask-image: radial-gradient(circle at center, black, transparent 88%);
+        opacity: 0.28;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .shell {
+        position: relative;
+        z-index: 1;
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 28px 20px 40px;
+      }
+
+      .glass-card {
+        background: var(--glass-bg);
+        border: var(--glass-border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--glass-shadow);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+      }
+
+      .glass-subcard {
+        background: var(--glass-bg-light);
+        border: 1px solid rgba(173, 192, 255, 0.12);
+        border-radius: var(--radius-md);
+        box-shadow: var(--glass-shadow-soft);
+      }
+
+      .nav {
+        position: sticky;
+        top: 16px;
+        display: grid;
+        gap: 18px;
+        padding: 22px 24px;
+        margin-bottom: 24px;
+        z-index: 3;
+      }
+
+      .nav-row {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      .brand {
+        display: grid;
+        gap: 8px;
+      }
+
+      .eyebrow {
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        color: var(--text-dim);
+      }
+
+      .brand h1,
+      .hero h2,
+      .section-head h2 {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .brand h1 {
+        font-size: clamp(1.6rem, 2.6vw, 2.35rem);
+      }
+
+      .brand p,
+      .hero p,
+      .section-copy,
+      .meta,
+      .empty,
+      .mono {
+        margin: 0;
+        color: var(--text-soft);
+      }
+
+      .auth-cluster {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .field,
+      .select,
+      .textarea {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.07);
+        color: var(--text-main);
+        border: 1px solid rgba(173, 192, 255, 0.15);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+      }
+
+      .field::placeholder,
+      .textarea::placeholder {
+        color: rgba(237, 244, 255, 0.35);
+      }
+
+      .textarea {
+        min-height: 84px;
+        resize: vertical;
+      }
+
+      .field:focus-visible,
+      .select:focus-visible,
+      .textarea:focus-visible,
+      .btn:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .token-wrap {
+        min-width: min(440px, 100%);
+        flex: 1 1 420px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .token-wrap .field {
+        min-width: 0;
+      }
+
+      .btn {
+        cursor: pointer;
+        border: 1px solid rgba(173, 192, 255, 0.18);
+        border-radius: 14px;
+        padding: 11px 15px;
+        color: var(--text-main);
+        background: rgba(255, 255, 255, 0.08);
+        transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        border-color: rgba(198, 220, 255, 0.34);
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      .btn.primary {
+        background: linear-gradient(135deg, rgba(130, 171, 255, 0.38), rgba(82, 145, 255, 0.2));
+      }
+
+      .btn.warn {
+        border-color: rgba(246, 197, 107, 0.3);
+      }
+
+      .btn.danger {
+        border-color: rgba(255, 141, 141, 0.3);
+      }
+
+      .btn.subtle {
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .status-line {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-soft);
+        font-size: 0.94rem;
+      }
+
+      .status-badge::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--warn);
+        box-shadow: 0 0 16px currentColor;
+      }
+
+      .status-badge.good::before {
+        background: var(--good);
+      }
+
+      .status-badge.bad::before {
+        background: var(--bad);
+      }
+
+      .hero {
+        padding: 28px 28px 24px;
+        display: grid;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .hero h2 {
+        font-size: clamp(2rem, 4vw, 3.15rem);
+        line-height: 1.02;
+        max-width: 12ch;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+        gap: 20px;
+      }
+
+      .hero-actions,
+      .quick-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .hero-stat-grid,
+      .overview-grid,
+      .metrics-grid,
+      .section-grid,
+      .utility-grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .hero-stat-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .overview-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-bottom: 24px;
+      }
+
+      .metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .metrics-grid-ops {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .utility-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .section-grid {
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      }
+
+      .stat-card,
+      .mini-card,
+      .panel,
+      .table-card {
+        padding: 18px;
+      }
+
+      .stat-card strong,
+      .mini-value {
+        display: block;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+        margin-top: 10px;
+        color: var(--accent-strong);
+      }
+
+      .mini-label {
+        color: var(--text-dim);
+        font-size: 0.86rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .dashboard-section {
+        padding: 24px;
+        margin-bottom: 22px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .section-head h2 {
+        font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+      }
+
+      .section-copy {
+        max-width: 66ch;
+      }
+
+      .segmented {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .segmented .btn.active {
+        background: rgba(143, 180, 255, 0.18);
+        border-color: rgba(143, 180, 255, 0.35);
+      }
+
+      .signal-grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .signal-row,
+      .detail-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 13px 14px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(173, 192, 255, 0.08);
+      }
+
+      .signal-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .signal-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--text-dim);
+      }
+
+      .signal-dot.good {
+        background: var(--good);
+      }
+
+      .signal-dot.warn {
+        background: var(--warn);
+      }
+
+      .signal-dot.bad {
+        background: var(--bad);
+      }
+
+      .chip-list,
+      .tag-list {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .chip,
+      .tag {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: var(--chip);
+        color: var(--text-soft);
+        font-size: 0.84rem;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .tag.good {
+        color: var(--good);
+      }
+
+      .tag.warn {
+        color: var(--warn);
+      }
+
+      .tag.bad {
+        color: var(--bad);
+      }
+
+      .classification-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 11px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(173, 192, 255, 0.12);
+        color: var(--text-soft);
+        font-size: 0.82rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .classification-pill.good {
+        color: var(--good);
+        border-color: rgba(116, 215, 167, 0.24);
+      }
+
+      .classification-pill.warn {
+        color: var(--warn);
+        border-color: rgba(246, 197, 107, 0.24);
+      }
+
+      .classification-pill.bad {
+        color: var(--bad);
+        border-color: rgba(255, 141, 141, 0.26);
+      }
+
+      .bench-summary-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .bench-summary-card {
+        padding: 16px;
+        border-radius: 18px;
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+          rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(173, 192, 255, 0.1);
+      }
+
+      .bench-summary-card strong {
+        display: block;
+        margin-top: 10px;
+        font-size: clamp(1.45rem, 3vw, 2.05rem);
+        color: var(--accent-strong);
+      }
+
+      .bench-summary-card.good strong {
+        color: var(--good);
+      }
+
+      .bench-summary-card.warn strong {
+        color: var(--warn);
+      }
+
+      .bench-summary-card.bad strong {
+        color: var(--bad);
+      }
+
+      .bench-summary-card .meta {
+        margin-top: 8px;
+      }
+
+      .bench-volatility-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .bench-volatility-row {
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(173, 192, 255, 0.08);
+      }
+
+      .bench-volatility-row summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .bench-volatility-row summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .bench-volatility-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .bench-volatility-body {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .bench-volatility-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .bench-volatility-cell {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(12, 18, 28, 0.48);
+        border: 1px solid rgba(173, 192, 255, 0.08);
+      }
+
+      .bench-volatility-cell strong {
+        display: block;
+        margin-top: 4px;
+        color: var(--accent-strong);
+      }
+
+      .delta-stack {
+        display: grid;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .delta-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        color: var(--text-soft);
+        font-size: 0.84rem;
+      }
+
+      .delta-line strong {
+        color: var(--accent-strong);
+        font-weight: 600;
+      }
+
+      .metric-table,
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.94rem;
+      }
+
+      .metric-table th,
+      .metric-table td,
+      .data-table th,
+      .data-table td {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--line-soft);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .metric-table th,
+      .data-table th {
+        color: var(--text-dim);
+        font-weight: 500;
+      }
+
+      .ticket-list,
+      .audit-list {
+        display: grid;
+        gap: 14px;
+      }
+
+      .ticket-card,
+      .audit-card {
+        padding: 18px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(173, 192, 255, 0.1);
+      }
+
+      .ticket-head,
+      .audit-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+
+      .ticket-title,
+      .audit-title {
+        display: grid;
+        gap: 6px;
+      }
+
+      .ticket-id,
+      .audit-id {
+        font-size: 0.84rem;
+        color: var(--text-dim);
+        word-break: break-all;
+      }
+
+      .ticket-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .action-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .filters {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin-bottom: 16px;
+      }
+
+      .field-group {
+        display: grid;
+        gap: 6px;
+      }
+
+      .field-group label {
+        color: var(--text-dim);
+        font-size: 0.84rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .utility-form {
+        display: grid;
+        gap: 12px;
+      }
+
+      .response-box {
+        min-height: 120px;
+        padding: 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(173, 192, 255, 0.08);
+        overflow: auto;
+        color: var(--text-soft);
+        font-family: "SFMono-Regular", "JetBrains Mono", "Menlo", monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .empty {
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px dashed rgba(173, 192, 255, 0.15);
+      }
+
+      .footer-note {
+        margin-top: 18px;
+        color: var(--text-dim);
+        font-size: 0.84rem;
+      }
+
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .glass-card {
+          background: rgba(10, 18, 30, 0.94);
+        }
+      }
+
+      @media (max-width: 1200px) {
+        .overview-grid,
+        .metrics-grid,
+        .bench-summary-strip,
+        .hero-stat-grid,
+        .utility-grid,
+        .section-grid,
+        .hero-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .filters {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          padding: 18px 14px 32px;
+        }
+
+        .nav,
+        .hero,
+        .dashboard-section {
+          padding: 18px;
+        }
+
+        .overview-grid,
+        .metrics-grid,
+        .bench-summary-strip,
+        .hero-stat-grid,
+        .utility-grid,
+        .section-grid,
+        .hero-grid,
+        .filters {
+          grid-template-columns: 1fr;
+        }
+
+        .token-wrap {
+          min-width: 100%;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          transition: none !important;
+          animation: none !important;
+        }
+
+        .glass-card {
+          backdrop-filter: none;
+          -webkit-backdrop-filter: none;
+          background: rgba(10, 18, 30, 0.94);
+        }
+      }
+
+      @media (prefers-contrast: more) {
+        .glass-card,
+        .glass-subcard,
+        .ticket-card,
+        .audit-card,
+        .response-box,
+        .empty {
+          border-color: rgba(255, 255, 255, 0.28);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="nav glass-card">
+        <div class="nav-row">
+          <div class="brand">
+            <span class="eyebrow">Context Gurd · Control Plane</span>
+            <h1>隐私门禁的审计、审批与观测中枢</h1>
+            <p>单页嵌入式管理面。输入 admin Bearer token 后，即可查看状态、审批 review、检索审计、触发热重载。</p>
+          </div>
+          <div class="auth-cluster">
+            <div class="token-wrap">
+              <input id="tokenInput" class="field" type="password" placeholder="admin token，如 admin-secret" autocomplete="off" />
+              <button id="toggleTokenBtn" class="btn subtle" type="button">显示</button>
+            </div>
+            <button id="saveTokenBtn" class="btn primary" type="button">保存令牌</button>
+            <button id="clearTokenBtn" class="btn subtle" type="button">清空</button>
+            <button id="refreshAllBtn" class="btn" type="button">立即刷新</button>
+          </div>
+        </div>
+        <div class="status-line">
+          <div id="connectionBadge" class="status-badge">等待接管</div>
+          <div class="meta">
+            <span id="lastUpdated">尚未刷新</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="hero glass-card">
+        <div class="hero-grid">
+          <div>
+            <span class="eyebrow">Operations cockpit</span>
+            <h2>把 review、audit、metrics 收拢成一张可执行的台面。</h2>
+            <p class="section-copy">
+              这个控制台优先展示低基数高价值信号：队列、依赖、fallback、proxy hard-fails、request/response 决策来源，以及最近需要人工审批的会话。
+            </p>
+            <div class="hero-actions" style="margin-top: 16px">
+              <a class="btn subtle" href="#config-summary">查看策略面</a>
+              <a class="btn subtle" href="#reviews">查看审批队列</a>
+              <a class="btn subtle" href="#audits">查看审计</a>
+              <a class="btn subtle" href="#utilities">运维工具</a>
+              <a class="btn subtle" href="#benchmarks">性能基线</a>
+            </div>
+          </div>
+          <div class="hero-stat-grid">
+            <article class="stat-card glass-subcard">
+              <span class="mini-label">Sessions</span>
+              <strong id="heroSessions">-</strong>
+              <p class="meta">当前活跃会话关联数</p>
+            </article>
+            <article class="stat-card glass-subcard">
+              <span class="mini-label">Review pending</span>
+              <strong id="heroPending">-</strong>
+              <p class="meta">待审批请求数量</p>
+            </article>
+            <article class="stat-card glass-subcard">
+              <span class="mini-label">Fallback hits</span>
+              <strong id="heroFallbacks">-</strong>
+              <p class="meta">当前累计降级命中数</p>
+            </article>
+            <article class="stat-card glass-subcard">
+              <span class="mini-label">Proxy hard-fails</span>
+              <strong id="heroProxyErrors">-</strong>
+              <p class="meta">未进入 upstream 前的硬失败累计数</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="overview-grid">
+        <article class="mini-card glass-card">
+          <div class="mini-label">Runtime</div>
+          <div class="mini-value" id="runtimeValue">-</div>
+          <p class="meta" id="runtimeMeta">等待状态快照</p>
+        </article>
+        <article class="mini-card glass-card">
+          <div class="mini-label">Reviews</div>
+          <div class="mini-value" id="reviewValue">-</div>
+          <p class="meta" id="reviewMeta">等待审批队列</p>
+        </article>
+        <article class="mini-card glass-card">
+          <div class="mini-label">Dependencies</div>
+          <div class="mini-value" id="dependencyValue">-</div>
+          <p class="meta" id="dependencyMeta">等待 sidecar 探测</p>
+        </article>
+        <article class="mini-card glass-card">
+          <div class="mini-label">Policy flow</div>
+          <div class="mini-value" id="policyValue">-</div>
+          <p class="meta" id="policyMeta">等待决策计数</p>
+        </article>
+      </section>
+
+      <section class="dashboard-section glass-card" id="status">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Runtime / Metrics</span>
+            <h2>网关状态总览</h2>
+          </div>
+          <div class="quick-actions">
+            <button class="btn subtle" type="button" id="statusRefreshBtn">只刷新状态</button>
+          </div>
+        </div>
+        <div class="section-grid">
+          <div class="panel glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Signals</span>
+                <h2 style="font-size: 1.3rem">关键运行信号</h2>
+              </div>
+            </div>
+            <div id="signalGrid" class="signal-grid">
+              <div class="empty">等待拉取状态。</div>
+            </div>
+          </div>
+          <div class="panel glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Features</span>
+                <h2 style="font-size: 1.3rem">开关与上游</h2>
+              </div>
+            </div>
+            <div id="featureList" class="signal-grid">
+              <div class="empty">等待拉取状态。</div>
+            </div>
+          </div>
+        </div>
+        <div class="metrics-grid metrics-grid-ops" style="margin-top: 18px">
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Review events</span>
+            <table class="metric-table">
+              <tbody id="reviewEventsTable">
+                <tr><td class="empty" colspan="2">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Fallback hits</span>
+            <table class="metric-table">
+              <tbody id="fallbackTable">
+                <tr><td class="empty" colspan="2">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Upstream latency</span>
+            <table class="metric-table">
+              <tbody id="latencyTable">
+                <tr><td class="empty" colspan="2">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Pre-upstream failure radar</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Stage</th><th>Kind</th><th>Count</th></tr>
+              </thead>
+              <tbody id="proxyErrorTable">
+                <tr><td class="empty" colspan="3">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+        <div class="metrics-grid" style="margin-top: 18px">
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Request decisions</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Decision</th><th>Source</th><th>Count</th></tr>
+              </thead>
+              <tbody id="requestDecisionTable">
+                <tr><td class="empty" colspan="3">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Response decisions</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Decision</th><th>Source</th><th>Count</th></tr>
+              </thead>
+              <tbody id="responseDecisionTable">
+                <tr><td class="empty" colspan="3">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Detections</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Direction</th><th>Label</th><th>Count</th></tr>
+              </thead>
+              <tbody id="detectionTable">
+                <tr><td class="empty" colspan="3">等待指标。</td></tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-section glass-card" id="benchmarks">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Performance / Benchmark matrix</span>
+            <h2>性能基线矩阵</h2>
+          </div>
+          <div class="quick-actions">
+            <button class="btn subtle" type="button" id="benchRefreshBtn">刷新基线</button>
+            <button class="btn subtle" type="button" id="promoteBaselineBtn">固化为 baseline</button>
+          </div>
+        </div>
+        <div class="section-grid">
+          <div class="panel glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Matrix health</span>
+                <h2 style="font-size: 1.3rem">基线总览</h2>
+              </div>
+            </div>
+            <div id="benchmarkMetaList" class="signal-grid">
+              <div class="empty">等待 benchmark summary。</div>
+            </div>
+          </div>
+          <div class="panel glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Scenario slices</span>
+                <h2 style="font-size: 1.3rem">场景特性与依赖</h2>
+              </div>
+            </div>
+            <div id="benchmarkFeatureList" class="signal-grid">
+              <div class="empty">等待 benchmark summary。</div>
+            </div>
+          </div>
+        </div>
+        <div id="benchmarkDriftSummary" class="bench-summary-strip">
+          <div class="bench-summary-card">
+            <span class="eyebrow">Regression debt</span>
+            <strong>0</strong>
+            <p class="meta">等待 baseline compare。</p>
+          </div>
+          <div class="bench-summary-card">
+            <span class="eyebrow">Improvement wins</span>
+            <strong>0</strong>
+            <p class="meta">等待 baseline compare。</p>
+          </div>
+          <div class="bench-summary-card">
+            <span class="eyebrow">Stable slice</span>
+            <strong>0</strong>
+            <p class="meta">等待 baseline compare。</p>
+          </div>
+          <div class="bench-summary-card">
+            <span class="eyebrow">New / missing</span>
+            <strong>0</strong>
+            <p class="meta">等待 baseline compare。</p>
+          </div>
+        </div>
+        <div style="margin-top: 18px">
+          <article class="table-card glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Regression radar</span>
+                <h2 style="font-size: 1.3rem">Top regressions / drift watchlist</h2>
+              </div>
+              <p id="benchmarkDriftMeta" class="meta">等待 baseline compare。</p>
+            </div>
+            <table class="metric-table">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>Verdict</th>
+                  <th>Delta</th>
+                </tr>
+              </thead>
+              <tbody id="benchmarkDriftTable">
+                <tr><td class="empty" colspan="3">等待 baseline compare。</td></tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+        <div class="metrics-grid" style="margin-top: 18px">
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Scenario leaderboard</span>
+            <table class="metric-table">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>Throughput / latency</th>
+                </tr>
+              </thead>
+              <tbody id="benchmarkScenarioTable">
+                <tr><td class="empty" colspan="2">等待 benchmark summary。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Protection surfaces</span>
+            <table class="metric-table">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>Security / dependency</th>
+                </tr>
+              </thead>
+              <tbody id="benchmarkDependencyTable">
+                <tr><td class="empty" colspan="2">等待 benchmark summary。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Artifacts</span>
+            <table class="metric-table">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>Artifacts root</th>
+                </tr>
+              </thead>
+              <tbody id="benchmarkArtifactTable">
+                <tr><td class="empty" colspan="2">等待 benchmark summary。</td></tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+        <p class="footer-note">基线数据来自 `benchmarks.summary_json_path` 指向的 summary.json。控制面只展示摘要，不主动触发压测。</p>
+      </section>
+
+      <section class="dashboard-section glass-card" id="config-summary">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Effective policy surface</span>
+            <h2>当前生效策略面</h2>
+            <p class="section-copy">这里展示热路径真正生效的配置摘要：principal、规则、附件、会话、OPA / Presidio / tokenization 等。只回显安全摘要，不暴露 secret 明文。</p>
+          </div>
+          <button class="btn subtle" type="button" id="configRefreshBtn">刷新策略面</button>
+        </div>
+        <div class="section-grid">
+          <div class="panel glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Runtime / Auth</span>
+                <h2 style="font-size: 1.3rem">运行与鉴权</h2>
+              </div>
+            </div>
+            <div id="configRuntimeList" class="signal-grid">
+              <div class="empty">等待策略摘要。</div>
+            </div>
+          </div>
+          <div class="panel glass-subcard">
+            <div class="section-head" style="margin-bottom: 12px">
+              <div>
+                <span class="eyebrow">Modules</span>
+                <h2 style="font-size: 1.3rem">检测与防护模块</h2>
+              </div>
+            </div>
+            <div id="configModuleList" class="signal-grid">
+              <div class="empty">等待策略摘要。</div>
+            </div>
+          </div>
+        </div>
+        <div class="metrics-grid" style="margin-top: 18px">
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Principals</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Name</th><th>Role</th><th>Clearance</th><th>Allowed labels</th></tr>
+              </thead>
+              <tbody id="configPrincipalTable">
+                <tr><td class="empty" colspan="4">等待策略摘要。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Regex rules</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Label</th><th>Actions</th><th>Masking</th><th>Pattern</th></tr>
+              </thead>
+              <tbody id="configRuleTable">
+                <tr><td class="empty" colspan="4">等待策略摘要。</td></tr>
+              </tbody>
+            </table>
+          </article>
+          <article class="table-card glass-subcard">
+            <span class="eyebrow">Integrations / Media</span>
+            <table class="data-table">
+              <thead>
+                <tr><th>Group</th><th>Value</th></tr>
+              </thead>
+              <tbody id="configIntegrationTable">
+                <tr><td class="empty" colspan="2">等待策略摘要。</td></tr>
+              </tbody>
+            </table>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-section glass-card" id="reviews">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Review queue</span>
+            <h2>审批队列</h2>
+            <p class="section-copy">按 `pending / approved / rejected / all` 查看 review ticket。对 pending 可直接 approve / reject 并写审批备注。</p>
+          </div>
+          <div class="segmented" id="reviewStatusTabs">
+            <button class="btn active" type="button" data-status="pending">Pending</button>
+            <button class="btn" type="button" data-status="approved">Approved</button>
+            <button class="btn" type="button" data-status="rejected">Rejected</button>
+            <button class="btn" type="button" data-status="all">All</button>
+          </div>
+        </div>
+        <div id="reviewsMeta" class="meta" style="margin-bottom: 12px">等待队列。</div>
+        <div id="reviewsList" class="ticket-list">
+          <div class="empty">等待拉取 review 队列。</div>
+        </div>
+      </section>
+
+      <section class="dashboard-section glass-card" id="audits">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Audit trail</span>
+            <h2>审计检索</h2>
+            <p class="section-copy">默认走 memory ring buffer，可切 file/both。这里只展示脱敏后的命中元数据，不回显原始明文。</p>
+          </div>
+          <button class="btn subtle" type="button" id="loadAuditsBtn">刷新审计</button>
+        </div>
+        <div class="panel glass-subcard" style="margin-bottom: 18px">
+          <div class="section-head" style="margin-bottom: 12px">
+            <div>
+              <span class="eyebrow">Pre-upstream incidents</span>
+              <h2 style="font-size: 1.3rem">Latest hard-fails</h2>
+              <p class="section-copy">只拉 `policy_source=request_pre_upstream_error` 的 skeleton audit。点击“套用到审计筛选”会自动回填 request_id / stage / kind，并跳到完整审计视角。</p>
+            </div>
+            <button class="btn subtle" type="button" id="latestHardFailsRefreshBtn">刷新 hard-fails</button>
+          </div>
+          <div id="latestHardFailsMeta" class="meta" style="margin-bottom: 12px">等待 hard-fail 审计。</div>
+          <div id="latestHardFailsList" class="audit-list">
+            <div class="empty">等待拉取最新 hard-fail。</div>
+          </div>
+        </div>
+        <form id="auditFilters" class="filters">
+          <div class="field-group">
+            <label for="auditSource">Source</label>
+            <select id="auditSource" name="source" class="select">
+              <option value="memory">memory</option>
+              <option value="file">file</option>
+              <option value="both">both</option>
+            </select>
+          </div>
+          <div class="field-group">
+            <label for="auditDecision">Decision</label>
+            <input id="auditDecision" class="field" name="decision" placeholder="allow / redact / review / block" />
+          </div>
+          <div class="field-group">
+            <label for="auditDirection">Direction</label>
+            <input id="auditDirection" class="field" name="direction" placeholder="request / response" />
+          </div>
+          <div class="field-group">
+            <label for="auditLabel">Label</label>
+            <input id="auditLabel" class="field" name="label" placeholder="email / phone / api_key" />
+          </div>
+          <div class="field-group">
+            <label for="auditPrincipal">Principal</label>
+            <input id="auditPrincipal" class="field" name="principal" placeholder="security-admin" />
+          </div>
+          <div class="field-group">
+            <label for="auditPolicySource">Policy source</label>
+            <input id="auditPolicySource" class="field" name="policy_source" placeholder="builtin / request_pre_upstream_error" />
+          </div>
+          <div class="field-group">
+            <label for="auditRequestId">Request ID</label>
+            <input id="auditRequestId" class="field" name="request_id" placeholder="uuid" />
+          </div>
+          <div class="field-group">
+            <label for="auditSession">Session</label>
+            <input id="auditSession" class="field" name="session_id" placeholder="incident-001" />
+          </div>
+          <div class="field-group">
+            <label for="auditErrorStage">Error stage</label>
+            <input id="auditErrorStage" class="field" name="error_stage" placeholder="request_pre_upstream" />
+          </div>
+          <div class="field-group">
+            <label for="auditErrorKind">Error kind</label>
+            <input id="auditErrorKind" class="field" name="error_kind" placeholder="attachment / presidio" />
+          </div>
+          <div class="field-group">
+            <label for="auditLimit">Limit</label>
+            <input id="auditLimit" class="field" name="limit" type="number" min="1" max="200" value="20" />
+          </div>
+          <div class="field-group">
+            <label>&nbsp;</label>
+            <button class="btn primary" type="submit">应用过滤</button>
+          </div>
+        </form>
+        <div id="auditsMeta" class="meta" style="margin-bottom: 12px">等待审计数据。</div>
+        <div id="auditsList" class="audit-list">
+          <div class="empty">等待拉取审计记录。</div>
+        </div>
+      </section>
+
+      <section class="dashboard-section glass-card" id="utilities">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Operations</span>
+            <h2>运维工具</h2>
+            <p class="section-copy">少量高频动作直接内嵌：reload 配置、detokenize 调试。</p>
+          </div>
+        </div>
+        <div class="utility-grid">
+          <article class="glass-subcard panel">
+            <span class="eyebrow">Reload config</span>
+            <h2 style="font-size: 1.3rem">热重载当前配置</h2>
+            <p class="section-copy">会重新装载规则、review 容量、OPA / Presidio / tokenization 等运行态配置。</p>
+            <div class="quick-actions" style="margin-top: 14px">
+              <button id="reloadBtn" class="btn warn" type="button">执行 reload</button>
+            </div>
+            <pre id="reloadResult" class="response-box" style="margin-top: 14px">尚未执行。</pre>
+          </article>
+          <article class="glass-subcard panel">
+            <span class="eyebrow">Detokenize</span>
+            <h2 style="font-size: 1.3rem">可逆 token 查询</h2>
+            <form id="detokenizeForm" class="utility-form" style="margin-top: 12px">
+              <input id="detokenizeToken" class="field" placeholder="[EMAIL_TOKEN:CGT1....]" />
+              <button class="btn primary" type="submit">查询 token</button>
+            </form>
+            <pre id="detokenizeResult" class="response-box" style="margin-top: 14px">等待输入 token。</pre>
+          </article>
+        </div>
+        <p class="footer-note">提示：控制台本身不含敏感数据，真正的数据访问仍受 admin API 的 Bearer 鉴权控制。页面只会把你输入的 token 保存在当前浏览器 localStorage 中。</p>
+      </section>
+    </div>
+
+    <script>
+      const state = {
+        reviewStatus: "pending",
+        latestHardFails: [],
+        latestHardFailLimit: 6,
+        tokenKey: "context-gurd.admin-token",
+        autoRefreshMs: 20000,
+      };
+
+      const el = {
+        tokenInput: document.getElementById("tokenInput"),
+        toggleTokenBtn: document.getElementById("toggleTokenBtn"),
+        saveTokenBtn: document.getElementById("saveTokenBtn"),
+        clearTokenBtn: document.getElementById("clearTokenBtn"),
+        refreshAllBtn: document.getElementById("refreshAllBtn"),
+        connectionBadge: document.getElementById("connectionBadge"),
+        lastUpdated: document.getElementById("lastUpdated"),
+        heroSessions: document.getElementById("heroSessions"),
+        heroPending: document.getElementById("heroPending"),
+        heroFallbacks: document.getElementById("heroFallbacks"),
+        heroProxyErrors: document.getElementById("heroProxyErrors"),
+        runtimeValue: document.getElementById("runtimeValue"),
+        runtimeMeta: document.getElementById("runtimeMeta"),
+        reviewValue: document.getElementById("reviewValue"),
+        reviewMeta: document.getElementById("reviewMeta"),
+        dependencyValue: document.getElementById("dependencyValue"),
+        dependencyMeta: document.getElementById("dependencyMeta"),
+        policyValue: document.getElementById("policyValue"),
+        policyMeta: document.getElementById("policyMeta"),
+        signalGrid: document.getElementById("signalGrid"),
+        featureList: document.getElementById("featureList"),
+        reviewEventsTable: document.getElementById("reviewEventsTable"),
+        fallbackTable: document.getElementById("fallbackTable"),
+        latencyTable: document.getElementById("latencyTable"),
+        proxyErrorTable: document.getElementById("proxyErrorTable"),
+        requestDecisionTable: document.getElementById("requestDecisionTable"),
+        responseDecisionTable: document.getElementById("responseDecisionTable"),
+        detectionTable: document.getElementById("detectionTable"),
+        benchRefreshBtn: document.getElementById("benchRefreshBtn"),
+        promoteBaselineBtn: document.getElementById("promoteBaselineBtn"),
+        benchmarkMetaList: document.getElementById("benchmarkMetaList"),
+        benchmarkFeatureList: document.getElementById("benchmarkFeatureList"),
+        benchmarkDriftSummary: document.getElementById("benchmarkDriftSummary"),
+        benchmarkDriftMeta: document.getElementById("benchmarkDriftMeta"),
+        benchmarkDriftTable: document.getElementById("benchmarkDriftTable"),
+        benchmarkScenarioTable: document.getElementById("benchmarkScenarioTable"),
+        benchmarkDependencyTable: document.getElementById("benchmarkDependencyTable"),
+        benchmarkArtifactTable: document.getElementById("benchmarkArtifactTable"),
+        configRefreshBtn: document.getElementById("configRefreshBtn"),
+        configRuntimeList: document.getElementById("configRuntimeList"),
+        configModuleList: document.getElementById("configModuleList"),
+        configPrincipalTable: document.getElementById("configPrincipalTable"),
+        configRuleTable: document.getElementById("configRuleTable"),
+        configIntegrationTable: document.getElementById("configIntegrationTable"),
+        reviewsMeta: document.getElementById("reviewsMeta"),
+        reviewsList: document.getElementById("reviewsList"),
+        reviewStatusTabs: document.getElementById("reviewStatusTabs"),
+        auditFilters: document.getElementById("auditFilters"),
+        loadAuditsBtn: document.getElementById("loadAuditsBtn"),
+        latestHardFailsRefreshBtn: document.getElementById("latestHardFailsRefreshBtn"),
+        latestHardFailsMeta: document.getElementById("latestHardFailsMeta"),
+        latestHardFailsList: document.getElementById("latestHardFailsList"),
+        auditsMeta: document.getElementById("auditsMeta"),
+        auditsList: document.getElementById("auditsList"),
+        statusRefreshBtn: document.getElementById("statusRefreshBtn"),
+        reloadBtn: document.getElementById("reloadBtn"),
+        reloadResult: document.getElementById("reloadResult"),
+        detokenizeForm: document.getElementById("detokenizeForm"),
+        detokenizeToken: document.getElementById("detokenizeToken"),
+        detokenizeResult: document.getElementById("detokenizeResult"),
+      };
+
+      function getToken() {
+        return el.tokenInput.value.trim();
+      }
+
+      function setToken(value, persist = false) {
+        el.tokenInput.value = value || "";
+        if (persist && value) {
+          localStorage.setItem(state.tokenKey, value);
+        }
+      }
+
+      function loadStoredToken() {
+        const saved = localStorage.getItem(state.tokenKey) || "";
+        if (saved) {
+          setToken(saved);
+        }
+      }
+
+      function clearStoredToken() {
+        localStorage.removeItem(state.tokenKey);
+        setToken("");
+      }
+
+      function setBadge(text, kind = "warn") {
+        el.connectionBadge.textContent = text;
+        el.connectionBadge.className = `status-badge ${kind}`;
+      }
+
+      function markUpdated() {
+        el.lastUpdated.textContent = `上次刷新：${new Date().toLocaleString("zh-CN")}`;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
+      }
+
+      function fmtDate(value) {
+        if (!value) return "—";
+        const date = new Date(value);
+        return Number.isNaN(date.valueOf()) ? value : date.toLocaleString("zh-CN");
+      }
+
+      function fmtNumber(value) {
+        if (value === null || value === undefined || value === "") return "0";
+        return new Intl.NumberFormat("zh-CN").format(Number(value));
+      }
+
+      function countObjectValues(map) {
+        return Object.values(map || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+      }
+
+      function flattenDecisionMatrix(matrix = {}) {
+        const rows = [];
+        for (const [decision, sources] of Object.entries(matrix)) {
+          for (const [source, count] of Object.entries(sources || {})) {
+            rows.push({ decision, source, count: Number(count || 0) });
+          }
+        }
+        return rows.sort((a, b) => b.count - a.count || a.decision.localeCompare(b.decision));
+      }
+
+      function flattenProxyErrorMatrix(matrix = {}) {
+        const rows = [];
+        for (const [stage, kinds] of Object.entries(matrix)) {
+          for (const [kind, count] of Object.entries(kinds || {})) {
+            rows.push({ stage, kind, count: Number(count || 0) });
+          }
+        }
+        return rows.sort((a, b) => b.count - a.count || a.stage.localeCompare(b.stage) || a.kind.localeCompare(b.kind));
+      }
+
+      async function api(path, options = {}) {
+        const token = getToken();
+        if (!token) {
+          throw new Error("请先输入 admin token");
+        }
+
+        const headers = new Headers(options.headers || {});
+        headers.set("Authorization", `Bearer ${token}`);
+        if (options.body && !headers.has("Content-Type")) {
+          headers.set("Content-Type", "application/json");
+        }
+
+        const response = await fetch(path, {
+          ...options,
+          headers,
+        });
+
+        const contentType = response.headers.get("content-type") || "";
+        const payload = contentType.includes("application/json")
+          ? await response.json()
+          : await response.text();
+
+        if (!response.ok) {
+          const message =
+            typeof payload === "string"
+              ? payload
+              : payload?.error?.message || payload?.message || JSON.stringify(payload);
+          throw new Error(message);
+        }
+
+        return payload;
+      }
+
+      function renderTableRows(target, rows, emptyText, columns) {
+        if (!rows.length) {
+          target.innerHTML = `<tr><td class="empty" colspan="${columns}">${escapeHtml(emptyText)}</td></tr>`;
+          return;
+        }
+        target.innerHTML = rows.join("");
+      }
+
+      function renderStatus(status) {
+        const summary = status?.observability?.metrics_summary || {};
+        const gauges = summary.gauges || {};
+        const counters = summary.counters || {};
+        const latency = summary.latency?.upstream_duration_seconds || {};
+        const payloadLatency = summary.latency?.payload_processing_duration_seconds || {};
+        const dependencies = status?.dependencies || {};
+        const features = status?.features || {};
+
+        const dependencyReadyCount = Object.values(status?.observability?.runtime_summary?.dependency_ready || {}).filter(Boolean).length;
+        const dependencyConfiguredCount = Object.values(dependencies).filter((item) => item && item.configured).length;
+        const degradedDependencies = Object.entries(dependencies).filter(([, item]) => item && item.configured && !item.reachable);
+        const requestRows = flattenDecisionMatrix(counters.policy_decisions_total?.request || {});
+        const responseRows = flattenDecisionMatrix(counters.policy_decisions_total?.response || {});
+        const proxyErrorRows = flattenProxyErrorMatrix(counters.proxy_errors_total || {});
+        const fallbackCount = countObjectValues(counters.processing_fallback_total || {});
+        const proxyErrorCount = proxyErrorRows.reduce((sum, row) => sum + Number(row.count || 0), 0);
+        const topProxyError = proxyErrorRows[0];
+
+        el.heroSessions.textContent = fmtNumber(gauges.active_sessions);
+        el.heroPending.textContent = fmtNumber(gauges.review_queue_pending);
+        el.heroFallbacks.textContent = fmtNumber(fallbackCount);
+        el.heroProxyErrors.textContent = fmtNumber(proxyErrorCount);
+
+        el.runtimeValue.textContent = fmtNumber(gauges.active_sessions);
+        el.runtimeMeta.textContent = `${escapeHtml(status.upstream || "—")} · ${escapeHtml(status.config_path || "—")}`;
+        el.reviewValue.textContent = `${fmtNumber(gauges.review_queue_pending)} / ${fmtNumber(gauges.review_queue_capacity)}`;
+        el.reviewMeta.textContent = `TTL ${fmtNumber(status.review_queue?.approval_ttl_secs || 0)}s`;
+        el.dependencyValue.textContent = `${dependencyReadyCount}/${dependencyConfiguredCount || Object.keys(dependencies).length}`;
+        el.dependencyMeta.textContent = degradedDependencies.length
+          ? `degraded: ${degradedDependencies.map(([name]) => name).join(", ")}`
+          : "all configured dependencies ready";
+        el.policyValue.textContent = fmtNumber(requestRows.reduce((sum, row) => sum + row.count, 0));
+        el.policyMeta.textContent = proxyErrorCount
+          ? `response signals ${fmtNumber(responseRows.reduce((sum, row) => sum + row.count, 0))} · hard-fails ${fmtNumber(proxyErrorCount)}`
+          : `response signals ${fmtNumber(responseRows.reduce((sum, row) => sum + row.count, 0))}`;
+
+        const signalRows = [
+          {
+            name: "Review queue",
+            status: Number(gauges.review_queue_pending) > 0 ? "warn" : "good",
+            value: `${fmtNumber(gauges.review_queue_pending)} pending / ${fmtNumber(gauges.review_queue_capacity)} capacity`,
+          },
+          {
+            name: "OPA",
+            status: dependencies.opa?.configured ? (dependencies.opa?.reachable ? "good" : "bad") : "warn",
+            value: dependencies.opa?.configured
+              ? `${dependencies.opa?.reachable ? "reachable" : "down"} · status ${dependencies.opa?.status_code ?? 0}`
+              : "not configured",
+          },
+          {
+            name: "Presidio",
+            status: dependencies.presidio?.configured ? (dependencies.presidio?.reachable ? "good" : "bad") : "warn",
+            value: dependencies.presidio?.configured
+              ? `${dependencies.presidio?.reachable ? "reachable" : "down"} · status ${dependencies.presidio?.status_code ?? 0}`
+              : "not configured",
+          },
+          {
+            name: "Fallback pressure",
+            status: fallbackCount > 0 ? "warn" : "good",
+            value: `${fmtNumber(fallbackCount)} cumulative fallback hits`,
+          },
+          {
+            name: "Proxy hard-fails",
+            status: proxyErrorCount > 0 ? "bad" : "good",
+            value: proxyErrorCount
+              ? `${fmtNumber(proxyErrorCount)} total · top ${topProxyError.stage}/${topProxyError.kind}`
+              : "no pre-upstream hard-fails",
+          },
+          {
+            name: "Audit buffer",
+            status: "good",
+            value: `${fmtNumber(status.audit_buffer?.len || 0)} / ${fmtNumber(status.audit_buffer?.capacity || 0)}`,
+          },
+          {
+            name: "Metrics surface",
+            status: "good",
+            value: `${escapeHtml(status.observability?.metrics_path || "/metrics")} ready`,
+          },
+        ];
+
+        el.signalGrid.innerHTML = signalRows
+          .map(
+            (row) => `
+              <div class="signal-row">
+                <div class="signal-name">
+                  <span class="signal-dot ${row.status}"></span>
+                  <strong>${escapeHtml(row.name)}</strong>
+                </div>
+                <span class="mono">${escapeHtml(row.value)}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        const featureRows = [
+          ["Config path", status.config_path || "—"],
+          ["Upstream", status.upstream || "—"],
+          ["OPA", features.opa ? "enabled" : "disabled"],
+          ["Presidio", features.presidio ? "enabled" : "disabled"],
+          ["Tokenization", features.tokenization ? "enabled" : "disabled"],
+          ["Attachment scanning", features.attachment_scanning ? "enabled" : "disabled"],
+          ["Response filtering", features.response_filtering ? "enabled" : "disabled"],
+          ["Session correlation", features.session_correlation ? "enabled" : "disabled"],
+        ];
+        el.featureList.innerHTML = featureRows
+          .map(
+            ([name, value]) => `
+              <div class="detail-row">
+                <span>${escapeHtml(name)}</span>
+                <span class="mono">${escapeHtml(value)}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        renderTableRows(
+          el.reviewEventsTable,
+          Object.entries(counters.review_events_total || {})
+            .sort((a, b) => Number(b[1]) - Number(a[1]))
+            .map(
+              ([event, count]) => `
+                <tr>
+                  <td>${escapeHtml(event)}</td>
+                  <td class="mono">${fmtNumber(count)}</td>
+                </tr>
+              `
+            ),
+          "暂无 review 事件。",
+          2
+        );
+
+        renderTableRows(
+          el.fallbackTable,
+          Object.entries(counters.processing_fallback_total || {})
+            .sort((a, b) => Number(b[1]) - Number(a[1]))
+            .map(
+              ([kind, count]) => `
+                <tr>
+                  <td>${escapeHtml(kind)}</td>
+                  <td class="mono">${fmtNumber(count)}</td>
+                </tr>
+              `
+            ),
+          "暂无 fallback 命中。",
+          2
+        );
+
+        renderTableRows(
+          el.latencyTable,
+          [
+            ...Object.entries(payloadLatency.request || {}).map(([kind, meta]) => ({
+              name: `request/${kind}`,
+              meta,
+            })),
+            ...Object.entries(payloadLatency.response || {}).map(([kind, meta]) => ({
+              name: `response/${kind}`,
+              meta,
+            })),
+            ...Object.entries(latency).map(([path, meta]) => ({
+              name: `upstream ${path}`,
+              meta,
+            })),
+          ]
+            .sort((a, b) => Number(b.meta?.count || 0) - Number(a.meta?.count || 0))
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHtml(row.name)}</td>
+                  <td class="mono">${fmtNumber(row.meta.count)} req / ${escapeHtml(String(row.meta.sum_seconds ?? 0))}s</td>
+                </tr>
+              `
+            ),
+          "暂无 upstream latency。",
+          2
+        );
+
+        renderTableRows(
+          el.proxyErrorTable,
+          proxyErrorRows.map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.stage)}</td>
+                <td>${escapeHtml(row.kind)}</td>
+                <td class="mono">${fmtNumber(row.count)}</td>
+              </tr>
+            `
+          ),
+          "暂无 proxy hard-fail。",
+          3
+        );
+
+        renderTableRows(
+          el.requestDecisionTable,
+          requestRows.map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.decision)}</td>
+                <td>${escapeHtml(row.source)}</td>
+                <td class="mono">${fmtNumber(row.count)}</td>
+              </tr>
+            `
+          ),
+          "暂无 request 决策计数。",
+          3
+        );
+
+        renderTableRows(
+          el.responseDecisionTable,
+          responseRows.map(
+            (row) => `
+              <tr>
+                <td>${escapeHtml(row.decision)}</td>
+                <td>${escapeHtml(row.source)}</td>
+                <td class="mono">${fmtNumber(row.count)}</td>
+              </tr>
+            `
+          ),
+          "暂无 response 决策计数。",
+          3
+        );
+
+        const detectionRows = [];
+        for (const [direction, labels] of Object.entries(counters.detections_total || {})) {
+          for (const [label, count] of Object.entries(labels || {})) {
+            detectionRows.push({ direction, label, count });
+          }
+        }
+        renderTableRows(
+          el.detectionTable,
+          detectionRows
+            .sort((a, b) => Number(b.count) - Number(a.count))
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHtml(row.direction)}</td>
+                  <td>${escapeHtml(row.label)}</td>
+                  <td class="mono">${fmtNumber(row.count)}</td>
+                </tr>
+              `
+            ),
+          "暂无 detection 计数。",
+          3
+        );
+      }
+
+      function benchmarkModeTags(scenario) {
+        const tags = [];
+        if (scenario.features?.tokenization) tags.push("tokenization");
+        if (scenario.features?.session_correlation) tags.push("review/session");
+        if (scenario.features?.opa) tags.push("opa");
+        if (scenario.features?.presidio) tags.push("presidio");
+        if (scenario.features?.attachment_scanning) tags.push("attachments");
+        return tags;
+      }
+
+      function benchmarkDriftTone(classification) {
+        if (classification === "regression") return "bad";
+        if (classification === "improvement") return "good";
+        return "warn";
+      }
+
+      function benchmarkGateTone(gate = {}) {
+        if (!gate || !gate.loaded) return "warn";
+        if (gate.aggregation_compatible === false) return "warn";
+        if (gate.status === "fail") return gate.fresh ? "bad" : "warn";
+        if (gate.status === "pass") return gate.fresh ? "good" : "warn";
+        return "warn";
+      }
+
+      function fmtSigned(value, digits = 2, suffix = "%") {
+        if (value === null || value === undefined || value === "" || Number.isNaN(Number(value))) {
+          return "—";
+        }
+        const number = Number(value);
+        const sign = number > 0 ? "+" : "";
+        return `${sign}${number.toFixed(digits)}${suffix}`;
+      }
+
+      function benchmarkDriftScore(item = {}) {
+        const throughputPenalty = Math.max(0, -Number(item.throughput_delta_pct ?? 0));
+        const latencyPenalty = Math.max(0, Number(item.avg_delta_pct ?? 0)) + Math.max(0, Number(item.p95_delta_pct ?? 0));
+        const throughputGain = Math.max(0, Number(item.throughput_delta_pct ?? 0));
+        const latencyGain = Math.max(0, -Number(item.avg_delta_pct ?? 0)) + Math.max(0, -Number(item.p95_delta_pct ?? 0));
+        if (item.classification === "regression") return 1000 + throughputPenalty + latencyPenalty;
+        if (item.classification === "new") return 500;
+        if (item.classification === "improvement") return 300 + throughputGain + latencyGain;
+        return Math.abs(Number(item.throughput_delta_pct ?? 0)) + Math.abs(Number(item.avg_delta_pct ?? 0)) + Math.abs(Number(item.p95_delta_pct ?? 0));
+      }
+
+      function benchmarkMetricLabel(metric) {
+        if (metric === "throughput_rps") return "Throughput";
+        if (metric === "avg_ms") return "Avg latency";
+        if (metric === "p95_ms") return "P95 latency";
+        return metric || "metric";
+      }
+
+      function fmtRangeValue(metric, low, high) {
+        const digits = metric === "throughput_rps" ? 0 : 3;
+        const suffix = metric === "throughput_rps" ? " rps" : " ms";
+        if (low === null || low === undefined || high === null || high === undefined) {
+          return "—";
+        }
+        return `${Number(low).toFixed(digits)} → ${Number(high).toFixed(digits)}${suffix}`;
+      }
+
+      function fmtSpread(metric, band = {}) {
+        const digits = metric === "throughput_rps" ? 0 : 3;
+        const suffix = metric === "throughput_rps" ? " rps" : " ms";
+        if (band.spread_abs === null || band.spread_abs === undefined) {
+          return "—";
+        }
+        const pct = band.spread_pct === null || band.spread_pct === undefined
+          ? "—"
+          : fmtSigned(band.spread_pct, 2, "%");
+        return `${Number(band.spread_abs).toFixed(digits)}${suffix} · ${pct}`;
+      }
+
+      function renderVolatilityDetail(item = {}) {
+        const pairs = item.volatility_bands || {};
+        const metrics = ["throughput_rps", "avg_ms", "p95_ms"];
+        const rows = metrics
+          .filter((metric) => pairs?.[metric]?.current)
+          .map((metric) => {
+            const pair = pairs[metric] || {};
+            const current = pair.current || {};
+            const baseline = pair.baseline || null;
+            return `
+              <details class="bench-volatility-row">
+                <summary>
+                  <div class="bench-volatility-title">
+                    <span class="chip">${escapeHtml(benchmarkMetricLabel(metric))}</span>
+                    <span class="mono">current ${escapeHtml(fmtRangeValue(metric, current.low, current.high))}</span>
+                    ${
+                      baseline
+                        ? `<span class="mono">baseline ${escapeHtml(fmtRangeValue(metric, baseline.low, baseline.high))}</span>`
+                        : '<span class="mono">baseline —</span>'
+                    }
+                  </div>
+                  <span class="meta">${escapeHtml(
+                    Array.isArray(item.suppressed_regression_metrics) && item.suppressed_regression_metrics.includes(metric)
+                      ? "noise-suppressed regression"
+                      : Array.isArray(item.suppressed_improvement_metrics) && item.suppressed_improvement_metrics.includes(metric)
+                        ? "noise-suppressed improvement"
+                        : "volatility band"
+                  )}</span>
+                </summary>
+                <div class="bench-volatility-body">
+                  <div class="bench-volatility-grid">
+                    <div class="bench-volatility-cell">
+                      <span class="eyebrow">Current</span>
+                      <strong>${escapeHtml(fmtRangeValue(metric, current.low, current.high))}</strong>
+                      <div class="meta">spread ${escapeHtml(fmtSpread(metric, current))} · samples ${fmtNumber(current.sample_count || 0)}</div>
+                    </div>
+                    <div class="bench-volatility-cell">
+                      <span class="eyebrow">Baseline</span>
+                      <strong>${baseline ? escapeHtml(fmtRangeValue(metric, baseline.low, baseline.high)) : "—"}</strong>
+                      <div class="meta">${
+                        baseline
+                          ? `spread ${escapeHtml(fmtSpread(metric, baseline))} · samples ${fmtNumber(baseline.sample_count || 0)}`
+                          : "baseline missing"
+                      }</div>
+                    </div>
+                  </div>
+                </div>
+              </details>
+            `;
+          });
+        if (!rows.length) {
+          return "";
+        }
+        return `<div class="bench-volatility-list">${rows.join("")}</div>`;
+      }
+
+      function renderBenchmarks(benchmarks = {}) {
+        const scenarios = Array.isArray(benchmarks.scenarios) ? benchmarks.scenarios : [];
+        const loaded = Boolean(benchmarks.loaded);
+        const generatedAt = benchmarks.generated_at ? fmtDate(benchmarks.generated_at) : "—";
+        const aggregation = benchmarks.aggregation || {};
+        const baseline = benchmarks.baseline || {};
+        const gate = benchmarks.gate || {};
+        const gateLoaded = Boolean(gate.loaded);
+        const gateTone = benchmarkGateTone(gate);
+        const baselineLoaded = Boolean(baseline.loaded);
+        const baselineGeneratedAt = baseline.generated_at ? fmtDate(baseline.generated_at) : "—";
+        const gateSummaryGeneratedAt = gate.summary_generated_at ? fmtDate(gate.summary_generated_at) : "—";
+        const driftRows = Array.isArray(baseline.scenarios) ? baseline.scenarios : [];
+        const regressions = driftRows.filter((item) => item.classification === "regression");
+        const improvements = driftRows.filter((item) => item.classification === "improvement");
+        const unchanged = driftRows.filter((item) => item.classification === "unchanged");
+        const newScenarios = driftRows.filter((item) => item.classification === "new");
+        const fastest = scenarios.length
+          ? scenarios.reduce((best, item) => (Number(item.throughput_rps || 0) > Number(best.throughput_rps || 0) ? item : best), scenarios[0])
+          : null;
+        const slowest = scenarios.length
+          ? scenarios.reduce((worst, item) => (Number(item.latency_ms?.p95 || 0) > Number(worst.latency_ms?.p95 || 0) ? item : worst), scenarios[0])
+          : null;
+        const sidecarScenarios = scenarios.filter((item) => item.features?.opa || item.features?.presidio).length;
+        const attachmentScenarios = scenarios.filter((item) => item.features?.attachment_scanning).length;
+        const requestKinds = [...new Set(scenarios.map((item) => item.request_payload_kind).filter(Boolean))];
+
+        const metaRows = [
+          {
+            name: "Matrix status",
+            status: benchmarks.enabled ? (loaded ? "good" : "bad") : "warn",
+            value: benchmarks.enabled
+              ? (loaded ? `loaded · ${fmtNumber(benchmarks.scenario_count || scenarios.length)} scenarios · ${generatedAt}` : `configured but unavailable · ${benchmarks.error || "missing summary"}`)
+              : "disabled",
+          },
+          {
+            name: "Summary path",
+            status: loaded ? "good" : benchmarks.enabled ? "warn" : "good",
+            value: benchmarks.configured_path || "—",
+          },
+          {
+            name: "Aggregation",
+            status: loaded ? "good" : benchmarks.enabled ? "warn" : "good",
+            value: loaded
+              ? `${aggregation.method || "single-run"} · ${fmtNumber(aggregation.runs || 1)} runs`
+              : "—",
+          },
+          {
+            name: "Baseline compare",
+            status: baselineLoaded ? (regressions.length ? "bad" : improvements.length ? "good" : "warn") : benchmarks.enabled ? "warn" : "good",
+            value: baselineLoaded
+              ? `${fmtNumber(baseline.scenario_count || driftRows.length)} scenarios · ${fmtNumber(baseline.regressions || 0)} regressions · ${fmtNumber(baseline.improvements || 0)} improvements · ${baselineGeneratedAt}`
+              : (baseline.configured_path ? `baseline missing · ${baseline.error || baseline.configured_path}` : "not configured"),
+          },
+          {
+            name: "Gate verdict",
+            status: gateTone,
+            value: gateLoaded
+              ? `${escapeHtml(String(gate.status || "unknown")).toUpperCase()} · ${gate.fresh ? "fresh" : "stale"} · ${gate.aggregation_compatible === false ? "aggregation mismatch" : `${fmtNumber(gate.regressions || 0)} regressions`} · ${gateSummaryGeneratedAt}`
+              : (gate.configured_path ? `gate report missing · ${gate.error || gate.configured_path}` : "not configured"),
+          },
+          {
+            name: "Fastest scenario",
+            status: fastest ? "good" : "warn",
+            value: fastest
+              ? `${fastest.scenario} · ${fmtNumber(fastest.requests)} req · ${escapeHtml(String(Number(fastest.throughput_rps || 0).toFixed(2)))} rps`
+              : "暂无 benchmark 数据",
+          },
+          {
+            name: "Highest p95",
+            status: slowest ? "warn" : "good",
+            value: slowest
+              ? `${slowest.scenario} · p95 ${escapeHtml(String(Number(slowest.latency_ms?.p95 || 0).toFixed(3)))} ms`
+              : "暂无 benchmark 数据",
+          },
+        ];
+        el.benchmarkMetaList.innerHTML = metaRows
+          .map(
+            (row) => `
+              <div class="signal-row">
+                <div class="signal-name">
+                  <span class="signal-dot ${row.status}"></span>
+                  <strong>${escapeHtml(row.name)}</strong>
+                </div>
+                <span class="mono">${escapeHtml(row.value)}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        const driftSummaryCards = [
+          {
+            tone: gateLoaded && gate.fresh && gate.status === "fail" ? "bad" : regressions.length ? "bad" : baselineLoaded ? "good" : "warn",
+            eyebrow: "Regression debt",
+            value: fmtNumber(gateLoaded ? gate.regressions || 0 : baseline.regressions || 0),
+            meta: gateLoaded
+              ? (gate.fresh
+                  ? (gate.failures?.length
+                      ? escapeHtml(gate.failures[0])
+                      : gate.status === "pass"
+                        ? "gate 已放行"
+                        : "gate 已执行")
+                  : "gate report 与当前 summary/baseline 不一致")
+              : baselineLoaded
+                ? (regressions.length
+                    ? `${escapeHtml(regressions[0].scenario)} 最凶`
+                    : "当前没有性能回归")
+                : (baseline.error || "baseline compare 未就位"),
+          },
+          {
+            tone: improvements.length ? "good" : "warn",
+            eyebrow: "Improvement wins",
+            value: fmtNumber(baseline.improvements || 0),
+            meta: baselineLoaded
+              ? (improvements.length
+                  ? `${escapeHtml(improvements[0].scenario)} 领先`
+                  : "暂无显著改善")
+              : "等待 baseline compare",
+          },
+          {
+            tone: baselineLoaded ? "good" : "warn",
+            eyebrow: "Stable slice",
+            value: fmtNumber(baseline.unchanged || 0),
+            meta: baselineLoaded
+              ? `${fmtNumber(unchanged.length)} scenarios 保持稳定`
+              : "等待 baseline compare",
+          },
+          {
+            tone: newScenarios.length ? "warn" : "good",
+            eyebrow: "New / missing",
+            value: fmtNumber(baseline.missing_in_baseline || 0),
+            meta: baselineLoaded
+              ? (newScenarios.length
+                  ? `${escapeHtml(newScenarios[0].scenario)} 尚未入基线`
+                  : "基线覆盖完整")
+              : (baseline.configured_path ? "baseline 文件未载入" : "baseline 未配置"),
+          },
+        ];
+        el.benchmarkDriftSummary.innerHTML = driftSummaryCards
+          .map(
+            (card) => `
+              <div class="bench-summary-card ${card.tone}">
+                <span class="eyebrow">${card.eyebrow}</span>
+                <strong>${card.value}</strong>
+                <p class="meta">${card.meta}</p>
+              </div>
+            `
+          )
+          .join("");
+
+        const featureRows = [
+          ["Request payload kinds", requestKinds.join(", ") || "—"],
+          ["Sidecar scenarios", `${fmtNumber(sidecarScenarios)} / ${fmtNumber(scenarios.length)}`],
+          ["Attachment scenarios", `${fmtNumber(attachmentScenarios)} / ${fmtNumber(scenarios.length)}`],
+          ["Tokenization scenarios", `${fmtNumber(scenarios.filter((item) => item.features?.tokenization).length)} / ${fmtNumber(scenarios.length)}`],
+          ["Session/review scenarios", `${fmtNumber(scenarios.filter((item) => item.features?.session_correlation).length)} / ${fmtNumber(scenarios.length)}`],
+          ["Baseline path", baseline.configured_path || "—"],
+          ["Gate report", gateLoaded ? `${String(gate.status || "unknown").toUpperCase()} / ${gate.fresh ? "fresh" : "stale"}` : (gate.error || gate.configured_path || "未加载")],
+          ["Baseline drift", baselineLoaded ? `${fmtNumber(baseline.regressions || 0)} regressions / ${fmtNumber(baseline.improvements || 0)} improvements / ${fmtNumber(baseline.unchanged || 0)} unchanged` : (baseline.error || "未加载")],
+          ["All scenarios OK", scenarios.length ? (scenarios.every((item) => item.ok) ? "yes" : "no") : "—"],
+        ];
+        el.benchmarkFeatureList.innerHTML = featureRows
+          .map(
+            ([name, value]) => `
+              <div class="detail-row">
+                <span>${escapeHtml(name)}</span>
+                <span class="mono">${escapeHtml(String(value))}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        const driftWatchlist = driftRows
+          .slice()
+          .sort((a, b) => benchmarkDriftScore(b) - benchmarkDriftScore(a))
+          .slice(0, 6);
+        el.benchmarkDriftMeta.textContent = gateLoaded
+          ? (
+              gate.aggregation_compatible === false
+                ? `gate ${String(gate.status || "unknown").toUpperCase()} · aggregation mismatch · summary ${gate.summary_aggregation?.method || "single-run"}/${fmtNumber(gate.summary_aggregation?.runs || 1)} vs baseline ${gate.baseline_aggregation?.method || "single-run"}/${fmtNumber(gate.baseline_aggregation?.runs || 1)}`
+                : `gate ${String(gate.status || "unknown").toUpperCase()} · ${gate.fresh ? "fresh" : "stale"} · regressions ${fmtNumber(gate.regressions || 0)} · improvements ${fmtNumber(gate.improvements || 0)}`
+            )
+          : baselineLoaded
+            ? `regression ${fmtNumber(regressions.length)} · improvement ${fmtNumber(improvements.length)} · unchanged ${fmtNumber(unchanged.length)} · new ${fmtNumber(newScenarios.length)}`
+            : (baseline.configured_path ? `baseline unavailable · ${baseline.error || baseline.configured_path}` : "baseline 未配置");
+
+        const gateRows = Array.isArray(gate.rows) ? gate.rows : [];
+        const watchRows = gateLoaded && gateRows.length ? gateRows : driftWatchlist;
+
+        renderTableRows(
+          el.benchmarkDriftTable,
+          watchRows.map(
+            (item) => `
+              <tr>
+                <td>
+                  ${escapeHtml(item.scenario)}
+                  <div class="meta">${
+                    item.classification === "new"
+                      ? "baseline 中缺失，需纳入后续 compare"
+                      : `baseline avg ${item.avg_ms_baseline !== null && item.avg_ms_baseline !== undefined ? escapeHtml(String(Number(item.avg_ms_baseline).toFixed(3))) : "—"} ms · p95 ${item.p95_ms_baseline !== null && item.p95_ms_baseline !== undefined ? escapeHtml(String(Number(item.p95_ms_baseline).toFixed(3))) : "—"} ms`
+                  }</div>
+                  ${renderVolatilityDetail(item)}
+                </td>
+                <td>
+                  <span class="classification-pill ${benchmarkDriftTone(item.classification)}">${escapeHtml(item.classification)}</span>
+                  ${
+                    gateLoaded && gate.failures?.some((message) => String(message).includes(String(item.scenario)))
+                      ? '<div class="meta">gate failure captured</div>'
+                      : ''
+                  }
+                  ${
+                    Array.isArray(item.suppressed_regression_metrics) && item.suppressed_regression_metrics.length
+                      ? `<div class="meta">noise-suppressed regression: ${escapeHtml(item.suppressed_regression_metrics.join(", "))}</div>`
+                      : ''
+                  }
+                  ${
+                    Array.isArray(item.suppressed_improvement_metrics) && item.suppressed_improvement_metrics.length
+                      ? `<div class="meta">noise-suppressed improvement: ${escapeHtml(item.suppressed_improvement_metrics.join(", "))}</div>`
+                      : ''
+                  }
+                </td>
+                <td>
+                  <div class="delta-stack">
+                    <div class="delta-line"><span>Throughput</span><strong>${escapeHtml(fmtSigned(item.throughput_delta_pct))}</strong></div>
+                    <div class="delta-line"><span>Avg latency</span><strong>${escapeHtml(fmtSigned(item.avg_delta_pct))}</strong></div>
+                    <div class="delta-line"><span>P95 latency</span><strong>${escapeHtml(fmtSigned(item.p95_delta_pct))}</strong></div>
+                  </div>
+                </td>
+              </tr>
+            `
+          ),
+          gateLoaded
+            ? (gate.failures?.length ? `gate 已执行，共 ${fmtNumber(gate.failures.length)} 条 failure。` : "gate 已执行，当前无阻断。")
+            : baselineLoaded ? "baseline compare 暂无差异。" : (benchmarks.enabled ? "等待 baseline compare。" : "benchmark matrix 未启用。"),
+          3
+        );
+
+        renderTableRows(
+          el.benchmarkScenarioTable,
+          scenarios
+            .slice()
+            .sort((a, b) => Number(b.throughput_rps || 0) - Number(a.throughput_rps || 0))
+            .map(
+              (scenario) => `
+                <tr>
+                  <td>
+                    ${escapeHtml(scenario.scenario)}
+                    <div class="meta">${escapeHtml(scenario.description || "—")}</div>
+                    ${
+                      scenario.aggregation?.runs > 1
+                        ? `<div class="meta">median-of-${escapeHtml(String(scenario.aggregation.runs))} · samples ${escapeHtml(
+                            scenario.aggregation.sample_runs
+                              .map((run) => `${run.run}:${Number(run.throughput_rps || 0).toFixed(0)}rps/${Number(run.p95_ms || 0).toFixed(2)}ms`)
+                              .join(" · ")
+                          )}</div>`
+                        : ""
+                    }
+                    ${
+                      gateLoaded && Array.isArray(gateRows) && gateRows.length
+                        ? (() => {
+                            const gateRow = gateRows.find((item) => item.scenario === scenario.scenario);
+                            return gateRow ? renderVolatilityDetail(gateRow) : "";
+                          })()
+                        : ""
+                    }
+                  </td>
+                  <td class="mono">
+                    ${escapeHtml(String(Number(scenario.throughput_rps || 0).toFixed(2)))} rps
+                    <div class="meta">avg ${escapeHtml(String(Number(scenario.latency_ms?.avg || 0).toFixed(3)))} ms · p95 ${escapeHtml(String(Number(scenario.latency_ms?.p95 || 0).toFixed(3)))} ms</div>
+                  </td>
+                </tr>
+              `
+            ),
+          benchmarks.enabled ? "暂无 benchmark summary。" : "benchmark matrix 未启用。",
+          2
+        );
+
+        renderTableRows(
+          el.benchmarkDependencyTable,
+          scenarios.map(
+            (scenario) => {
+              const featureTags = benchmarkModeTags(scenario)
+                .map((tag) => `<span class="chip">${escapeHtml(tag)}</span>`)
+                .join("");
+              const dependencyTags = [
+                scenario.dependency_ready?.opa ? '<span class="chip">opa ready</span>' : '',
+                scenario.dependency_ready?.presidio ? '<span class="chip">presidio ready</span>' : '',
+                ...(scenario.decision_sources?.request || []).map((source) => `<span class="chip">req:${escapeHtml(source)}</span>`),
+                ...(scenario.decision_sources?.response || []).map((source) => `<span class="chip">resp:${escapeHtml(source)}</span>`),
+              ].join('');
+              const drift = driftRows.find((item) => item.scenario === scenario.scenario);
+              const driftBadge = drift
+                ? `<span class="chip ${benchmarkDriftTone(drift.classification)}">baseline:${escapeHtml(drift.classification)}</span>`
+                : '';
+              const driftMeta = drift
+                ? drift.classification === "new"
+                  ? '<div class="meta">baseline missing · 需先固化后再 compare</div>'
+                  : `<div class="meta">thr ${escapeHtml(fmtSigned(drift.throughput_delta_pct))} · avg ${escapeHtml(fmtSigned(drift.avg_delta_pct))} · p95 ${escapeHtml(fmtSigned(drift.p95_delta_pct))}</div>`
+                : '<div class="meta">baseline unavailable</div>';
+              return `
+                <tr>
+                  <td>${escapeHtml(scenario.scenario)}</td>
+                  <td>
+                    <div class="chip-list">${featureTags || '<span class="chip">builtin only</span>'}${driftBadge}</div>
+                    <div class="chip-list" style="margin-top: 8px">${dependencyTags || '<span class="chip">no extra dependency</span>'}</div>
+                    ${driftMeta}
+                  </td>
+                </tr>
+              `;
+            }
+          ),
+          benchmarks.enabled ? "暂无 benchmark summary。" : "benchmark matrix 未启用。",
+          2
+        );
+
+        renderTableRows(
+          el.benchmarkArtifactTable,
+          scenarios.map(
+            (scenario) => `
+              <tr>
+                <td>${escapeHtml(scenario.scenario)}</td>
+                <td class="mono">${escapeHtml(scenario.artifacts_root || "—")}</td>
+              </tr>
+            `
+          ),
+          benchmarks.enabled ? "暂无 benchmark summary。" : "benchmark matrix 未启用。",
+          2
+        );
+      }
+
+      async function loadBenchmarksFromStatus(statusPayload) {
+        const payload = statusPayload || (await api("/admin/status"));
+        renderBenchmarks(payload?.observability?.benchmarks || {});
+        return payload;
+      }
+
+      async function loadStatus() {
+        const payload = await api("/admin/status");
+        renderStatus(payload);
+        renderBenchmarks(payload?.observability?.benchmarks || {});
+        return payload;
+      }
+
+      function renderConfigSummary(payload) {
+        const runtime = payload.runtime || {};
+        const auth = payload.auth || {};
+        const detection = payload.detection || {};
+        const tokenization = payload.tokenization || {};
+        const session = payload.session || {};
+        const responseFiltering = payload.response_filtering || {};
+        const attachments = payload.attachments || {};
+        const review = payload.review || {};
+        const audit = payload.audit || {};
+        const opa = payload.policy_backend?.opa || null;
+        const presidio = detection.presidio || null;
+
+        const runtimeRows = [
+          ["Bind", runtime.bind || "—"],
+          ["Body limit", fmtNumber(runtime.request_body_limit_bytes)],
+          ["Config path", payload.config_path || "—"],
+          ["Upstream", runtime.upstream_base_url || "—"],
+          ["Forward headers", (runtime.upstream_forward_headers || []).join(", ") || "—"],
+          ["Auth header", auth.header_name || "authorization"],
+          ["Principal count", fmtNumber(auth.principal_count || 0)],
+          ["Upstream auth env", runtime.upstream_auth_env_configured ? (runtime.upstream_auth_env_present ? "configured + present" : "configured but missing") : "disabled"],
+        ];
+        el.configRuntimeList.innerHTML = runtimeRows
+          .map(
+            ([name, value]) => `
+              <div class="detail-row">
+                <span>${escapeHtml(name)}</span>
+                <span class="mono">${escapeHtml(String(value))}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        const moduleRows = [
+          ["Session correlation", session.enabled ? `enabled · ${session.header_name} · threshold ${session.correlation_threshold}` : "disabled"],
+          ["Response filtering", responseFiltering.enabled ? `enabled · json=${String(responseFiltering.scan_json)} · sse=${String(responseFiltering.scan_sse)}` : "disabled"],
+          ["Attachments", attachments.enabled ? `enabled · ${fmtNumber(attachments.max_bytes)} bytes · ${fmtNumber(attachments.max_text_chars)} chars` : "disabled"],
+          ["Tokenization", tokenization.enabled ? `active · prefix ${tokenization.token_prefix || "—"} · env ${tokenization.key_env_present ? "present" : "missing"}` : tokenization.configured ? `configured but inactive · env ${tokenization.key_env_present ? "present" : "missing"}` : "disabled"],
+          ["OPA", opa ? `${opa.enabled ? "enabled" : "disabled"} · runtime_loaded=${String(opa.runtime_loaded)} · timeout ${fmtNumber(opa.timeout_ms)}ms · fail_open=${String(opa.fail_open)}` : "not configured"],
+          ["Presidio", presidio ? `${presidio.enabled ? "enabled" : "disabled"} · ${presidio.language || "—"} · entities ${fmtNumber(presidio.entity_count || 0)}` : "not configured"],
+          ["Review queue", `${fmtNumber(review.capacity)} cap · ttl ${fmtNumber(review.approval_ttl_secs)}s · preview ${fmtNumber(review.preview_chars)} chars`],
+          ["Audit sink", `${audit.emit_stdout ? "stdout+file" : "file"} · buffer ${fmtNumber(audit.buffer_capacity)}`],
+        ];
+        el.configModuleList.innerHTML = moduleRows
+          .map(
+            ([name, value]) => `
+              <div class="detail-row">
+                <span>${escapeHtml(name)}</span>
+                <span class="mono">${escapeHtml(String(value))}</span>
+              </div>
+            `
+          )
+          .join("");
+
+        renderTableRows(
+          el.configPrincipalTable,
+          (auth.principals || []).map(
+            (principal) => `
+              <tr>
+                <td>${escapeHtml(principal.name)}</td>
+                <td>${escapeHtml(principal.role)}</td>
+                <td>${escapeHtml(principal.clearance)}</td>
+                <td>${escapeHtml((principal.allowed_labels || []).join(", ") || "—")}</td>
+              </tr>
+            `
+          ),
+          "暂无 principal。",
+          4
+        );
+
+        renderTableRows(
+          el.configRuleTable,
+          (detection.rules || []).map(
+            (rule) => `
+              <tr>
+                <td>${escapeHtml(rule.label)}<div class="meta">${escapeHtml(rule.name)}</div></td>
+                <td>${escapeHtml(rule.authorized_action)} / ${escapeHtml(rule.unauthorized_action)}<div class="meta">min ${escapeHtml(rule.min_clearance)}</div></td>
+                <td>${escapeHtml(rule.masking)}<div class="meta">${escapeHtml(rule.severity)}</div></td>
+                <td><span class="mono">${escapeHtml(rule.pattern_preview || "—")}</span></td>
+              </tr>
+            `
+          ),
+          "暂无 regex 规则。",
+          4
+        );
+
+        const integrationRows = [
+          ["Ignored JSON pointers", (detection.ignore_json_pointers || []).join(", ") || "—"],
+          ["High entropy", detection.high_entropy ? `${String(detection.high_entropy.enabled)} · len ${fmtNumber(detection.high_entropy.min_length)} · entropy ${escapeHtml(String(detection.high_entropy.min_entropy))} · ${escapeHtml(detection.high_entropy.label)}` : "disabled"],
+          ["Presidio entities", (presidio?.entities || []).map((entity) => `${entity.entity_type}:${entity.label}`).join(", ") || "—"],
+          ["Attachment media", (attachments.allowed_media_types || []).join(", ") || "—"],
+          ["Tokenization key env", tokenization.key_env || "—"],
+          ["Tokenization required", tokenization.required_by_rules ? "yes" : "no"],
+          ["Review log", review.jsonl_path || "—"],
+          ["Audit log", audit.jsonl_path || "—"],
+          ["OPA URL", opa?.url || "—"],
+          ["Presidio URL", presidio?.analyzer_url || "—"],
+        ];
+        renderTableRows(
+          el.configIntegrationTable,
+          integrationRows.map(
+            ([group, value]) => `
+              <tr>
+                <td>${escapeHtml(group)}</td>
+                <td class="mono">${escapeHtml(String(value))}</td>
+              </tr>
+            `
+          ),
+          "暂无集成信息。",
+          2
+        );
+      }
+
+      async function loadConfigSummary() {
+        const payload = await api("/admin/config-summary");
+        renderConfigSummary(payload);
+        return payload;
+      }
+
+      function renderReviewResolution(resolution) {
+        if (!resolution) {
+          return `<span class="tag warn">pending</span>`;
+        }
+        return `
+          <div class="meta">
+            resolved by <strong>${escapeHtml(resolution.resolved_by)}</strong> · ${escapeHtml(fmtDate(resolution.resolved_at))}
+            ${resolution.note ? `· note: ${escapeHtml(resolution.note)}` : ""}
+          </div>
+        `;
+      }
+
+      function reviewStatusTag(status) {
+        const kind = status === "approved" ? "good" : status === "rejected" ? "bad" : "warn";
+        return `<span class="tag ${kind}">${escapeHtml(status)}</span>`;
+      }
+
+      function renderReviews(payload) {
+        const records = payload.records || [];
+        el.reviewsMeta.textContent = `${payload.count || 0} tickets · view = ${payload.status}`;
+        if (!records.length) {
+          el.reviewsList.innerHTML = `<div class="empty">当前筛选下没有 ticket。</div>`;
+          return;
+        }
+
+        el.reviewsList.innerHTML = records
+          .map((ticket) => {
+            const labels = (ticket.matched_labels || []).map((label) => `<span class="chip">${escapeHtml(label)}</span>`).join("");
+            const findings = (ticket.findings || [])
+              .slice(0, 4)
+              .map((finding) => `<span class="chip">${escapeHtml(finding.label)} · ${escapeHtml(finding.pointer || "/")}</span>`)
+              .join("");
+            const reviewActions =
+              ticket.status === "pending"
+                ? `
+                  <div class="ticket-actions">
+                    <textarea class="textarea" data-note-for="${escapeHtml(ticket.id)}" placeholder="审批备注，可选"></textarea>
+                    <div class="action-row">
+                      <button class="btn primary" type="button" data-review-action="approve" data-ticket-id="${escapeHtml(ticket.id)}">Approve</button>
+                      <button class="btn danger" type="button" data-review-action="reject" data-ticket-id="${escapeHtml(ticket.id)}">Reject</button>
+                    </div>
+                  </div>
+                `
+                : "";
+            return `
+              <article class="ticket-card">
+                <div class="ticket-head">
+                  <div class="ticket-title">
+                    <strong>${escapeHtml(ticket.path)}</strong>
+                    <span class="ticket-id">${escapeHtml(ticket.id)}</span>
+                  </div>
+                  ${reviewStatusTag(ticket.status)}
+                </div>
+                <div class="meta">principal ${escapeHtml(ticket.principal)} · tenant ${escapeHtml(ticket.tenant_id)} · ${escapeHtml(fmtDate(ticket.created_at))}</div>
+                <div class="chip-list" style="margin-top: 12px">${labels || `<span class="chip">no labels</span>`}</div>
+                <div class="chip-list" style="margin-top: 10px">${findings || `<span class="chip">no findings</span>`}</div>
+                <div class="meta" style="margin-top: 12px">
+                  source = ${escapeHtml(ticket.policy_source)} · post approval = ${escapeHtml(ticket.post_approval_action)} · session ${escapeHtml(ticket.session_id || "—")}
+                </div>
+                <div class="meta" style="margin-top: 8px">${escapeHtml(ticket.decision_reason || "无额外原因")}</div>
+                <div class="meta" style="margin-top: 8px">${renderReviewResolution(ticket.resolution)}</div>
+                ${reviewActions}
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      async function loadReviews(status = state.reviewStatus) {
+        state.reviewStatus = status;
+        for (const button of el.reviewStatusTabs.querySelectorAll("[data-status]")) {
+          button.classList.toggle("active", button.dataset.status === status);
+        }
+        const payload = await api(`/admin/reviews?status=${encodeURIComponent(status)}&limit=20`);
+        renderReviews(payload);
+      }
+
+      async function resolveReview(ticketId, approve) {
+        const noteEl = document.querySelector(`[data-note-for="${CSS.escape(ticketId)}"]`);
+        const note = noteEl ? noteEl.value.trim() : "";
+        await api("/admin/reviews/resolve", {
+          method: "POST",
+          body: JSON.stringify({ id: ticketId, approve, note: note || null }),
+        });
+        await Promise.all([loadStatus(), loadReviews(state.reviewStatus)]);
+        setBadge(approve ? "审批已批准" : "审批已拒绝", approve ? "good" : "bad");
+        markUpdated();
+      }
+
+      function renderAudits(payload) {
+        const records = payload.records || [];
+        el.auditsMeta.textContent = `${payload.count || 0} records · source = ${payload.source}`;
+        if (!records.length) {
+          el.auditsList.innerHTML = `<div class="empty">当前过滤下没有审计记录。</div>`;
+          return;
+        }
+        el.auditsList.innerHTML = records
+          .map((record) => {
+            const labels = (record.matched_labels || []).map((label) => `<span class="chip">${escapeHtml(label)}</span>`).join("");
+            const findings = (record.findings || [])
+              .slice(0, 4)
+              .map((finding) => `<span class="chip">${escapeHtml(finding.label)} · ${escapeHtml(finding.action)}</span>`)
+              .join("");
+            const hardFailTags = [
+              record.error_stage ? `<span class="chip">stage ${escapeHtml(record.error_stage)}</span>` : "",
+              record.error_kind ? `<span class="chip">kind ${escapeHtml(record.error_kind)}</span>` : "",
+            ].join("");
+            return `
+              <article class="audit-card">
+                <div class="audit-head">
+                  <div class="audit-title">
+                    <strong>${escapeHtml(record.direction)} · ${escapeHtml(record.path)}</strong>
+                    <span class="audit-id">${escapeHtml(record.request_id)}</span>
+                  </div>
+                  <div class="tag-list">
+                    ${reviewStatusTag(record.decision)}
+                    <span class="tag">${escapeHtml(record.policy_source)}</span>
+                  </div>
+                </div>
+                <div class="meta">principal ${escapeHtml(record.principal)} · tenant ${escapeHtml(record.tenant_id)} · ${escapeHtml(fmtDate(record.ts))}</div>
+                ${hardFailTags ? `<div class="chip-list" style="margin-top: 10px">${hardFailTags}</div>` : ""}
+                <div class="chip-list" style="margin-top: 12px">${labels || `<span class="chip">no labels</span>`}</div>
+                <div class="chip-list" style="margin-top: 10px">${findings || `<span class="chip">no findings</span>`}</div>
+                <div class="meta" style="margin-top: 10px">
+                  session ${escapeHtml(record.session_id || "—")} · escalated ${String(record.session_escalated)} · status ${escapeHtml(String(record.status_code ?? "—"))}
+                </div>
+                <div class="meta" style="margin-top: 8px">${escapeHtml(record.decision_reason || "无额外原因")}</div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      function setAuditFilterValue(name, value) {
+        const field = el.auditFilters.elements.namedItem(name);
+        if (field && "value" in field) {
+          field.value = value ?? "";
+        }
+      }
+
+      function renderLatestHardFails(payload) {
+        const records = payload.records || [];
+        state.latestHardFails = records;
+        el.latestHardFailsMeta.textContent = `${payload.count || 0} records · source = ${payload.source}`;
+        if (!records.length) {
+          el.latestHardFailsList.innerHTML = `<div class="empty">最近没有 pre-upstream hard-fail。</div>`;
+          return;
+        }
+
+        el.latestHardFailsList.innerHTML = records
+          .map((record, index) => {
+            const hardFailTags = [
+              record.error_stage ? `<span class="chip">stage ${escapeHtml(record.error_stage)}</span>` : "",
+              record.error_kind ? `<span class="chip">kind ${escapeHtml(record.error_kind)}</span>` : "",
+              `<span class="chip">status ${escapeHtml(String(record.status_code ?? "—"))}</span>`,
+            ].join("");
+            return `
+              <article class="audit-card">
+                <div class="audit-head">
+                  <div class="audit-title">
+                    <strong>${escapeHtml(record.direction)} · ${escapeHtml(record.path)}</strong>
+                    <span class="audit-id">${escapeHtml(record.request_id)}</span>
+                  </div>
+                  <div class="tag-list">
+                    ${reviewStatusTag(record.decision)}
+                    <span class="tag">${escapeHtml(record.policy_source)}</span>
+                  </div>
+                </div>
+                <div class="meta">principal ${escapeHtml(record.principal)} · tenant ${escapeHtml(record.tenant_id)} · ${escapeHtml(fmtDate(record.ts))}</div>
+                <div class="chip-list" style="margin-top: 10px">${hardFailTags}</div>
+                <div class="meta" style="margin-top: 10px">${escapeHtml(record.decision_reason || "无额外原因")}</div>
+                <div class="action-row" style="margin-top: 14px">
+                  <button class="btn primary" type="button" data-hard-fail-focus="${index}">套用到审计筛选</button>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
+      async function loadLatestHardFails() {
+        const params = new URLSearchParams({
+          source: "both",
+          policy_source: "request_pre_upstream_error",
+          limit: String(state.latestHardFailLimit),
+        });
+        const payload = await api(`/admin/audits?${params.toString()}`);
+        renderLatestHardFails(payload);
+        return payload;
+      }
+
+      async function applyHardFailAuditFilters(record) {
+        setAuditFilterValue("source", "both");
+        setAuditFilterValue("decision", "block");
+        setAuditFilterValue("direction", record.direction || "request");
+        setAuditFilterValue("label", "");
+        setAuditFilterValue("principal", "");
+        setAuditFilterValue("policy_source", "request_pre_upstream_error");
+        setAuditFilterValue("request_id", record.request_id || "");
+        setAuditFilterValue("session_id", "");
+        setAuditFilterValue("error_stage", record.error_stage || "");
+        setAuditFilterValue("error_kind", record.error_kind || "");
+        await loadAudits();
+        document.getElementById("audits")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      async function loadAudits() {
+        const params = new URLSearchParams();
+        for (const [name, value] of new FormData(el.auditFilters).entries()) {
+          if (String(value).trim()) {
+            params.set(name, String(value).trim());
+          }
+        }
+        const payload = await api(`/admin/audits?${params.toString()}`);
+        renderAudits(payload);
+      }
+
+      async function runDetokenize(event) {
+        event.preventDefault();
+        const token = el.detokenizeToken.value.trim();
+        if (!token) {
+          el.detokenizeResult.textContent = "请输入 token。";
+          return;
+        }
+        const payload = await api("/admin/detokenize", {
+          method: "POST",
+          body: JSON.stringify({ token }),
+        });
+        el.detokenizeResult.textContent = JSON.stringify(payload, null, 2);
+      }
+
+      async function runReload() {
+        const payload = await api("/admin/reload", { method: "POST" });
+        el.reloadResult.textContent = JSON.stringify(payload, null, 2);
+        await Promise.all([loadStatus(), loadConfigSummary()]);
+      }
+
+      async function promoteBaseline() {
+        const payload = await api("/admin/benchmarks/promote", { method: "POST" });
+        el.reloadResult.textContent = JSON.stringify(payload, null, 2);
+        await loadStatus();
+        return payload;
+      }
+
+      async function refreshAll() {
+        if (!getToken()) {
+          setBadge("等待 admin token", "warn");
+          return;
+        }
+
+        setBadge("刷新中…", "warn");
+        try {
+          await Promise.all([loadStatus(), loadConfigSummary(), loadReviews(state.reviewStatus), loadLatestHardFails(), loadAudits()]);
+          setBadge("控制面已同步", "good");
+          markUpdated();
+        } catch (error) {
+          setBadge("刷新失败", "bad");
+          console.error(error);
+          el.reloadResult.textContent = String(error.message || error);
+        }
+      }
+
+      function attachEvents() {
+        el.toggleTokenBtn.addEventListener("click", () => {
+          const next = el.tokenInput.type === "password" ? "text" : "password";
+          el.tokenInput.type = next;
+          el.toggleTokenBtn.textContent = next === "password" ? "显示" : "隐藏";
+        });
+
+        el.saveTokenBtn.addEventListener("click", async () => {
+          const token = getToken();
+          if (!token) {
+            setBadge("令牌为空", "bad");
+            return;
+          }
+          localStorage.setItem(state.tokenKey, token);
+          setBadge("令牌已保存", "good");
+          await refreshAll();
+        });
+
+        el.clearTokenBtn.addEventListener("click", () => {
+          clearStoredToken();
+          setBadge("令牌已清空", "warn");
+        });
+
+        el.refreshAllBtn.addEventListener("click", refreshAll);
+        el.statusRefreshBtn.addEventListener("click", async () => {
+          try {
+            await Promise.all([loadStatus(), loadConfigSummary()]);
+            setBadge("状态已刷新", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("状态刷新失败", "bad");
+          }
+        });
+        el.benchRefreshBtn.addEventListener("click", async () => {
+          try {
+            const status = await loadStatus();
+            await loadBenchmarksFromStatus(status);
+            setBadge("性能基线已刷新", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("性能基线刷新失败", "bad");
+          }
+        });
+        el.promoteBaselineBtn.addEventListener("click", async () => {
+          try {
+            await promoteBaseline();
+            setBadge("baseline 路径已就位", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("baseline 提示失败", "bad");
+            el.reloadResult.textContent = String(error.message || error);
+          }
+        });
+        el.configRefreshBtn.addEventListener("click", async () => {
+          try {
+            await loadConfigSummary();
+            setBadge("策略面已刷新", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("策略面刷新失败", "bad");
+          }
+        });
+        el.loadAuditsBtn.addEventListener("click", loadAudits);
+        el.latestHardFailsRefreshBtn.addEventListener("click", async () => {
+          try {
+            await loadLatestHardFails();
+            setBadge("hard-fails 已刷新", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("hard-fails 刷新失败", "bad");
+            console.error(error);
+          }
+        });
+        el.auditFilters.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          await loadAudits();
+        });
+        el.reloadBtn.addEventListener("click", async () => {
+          try {
+            await runReload();
+            setBadge("配置已重载", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("重载失败", "bad");
+            el.reloadResult.textContent = String(error.message || error);
+          }
+        });
+        el.detokenizeForm.addEventListener("submit", async (event) => {
+          try {
+            await runDetokenize(event);
+          } catch (error) {
+            el.detokenizeResult.textContent = String(error.message || error);
+          }
+        });
+        el.reviewStatusTabs.addEventListener("click", async (event) => {
+          const button = event.target.closest("[data-status]");
+          if (!button) return;
+          await loadReviews(button.dataset.status);
+        });
+        el.reviewsList.addEventListener("click", async (event) => {
+          const button = event.target.closest("[data-review-action]");
+          if (!button) return;
+          const approve = button.dataset.reviewAction === "approve";
+          try {
+            button.disabled = true;
+            await resolveReview(button.dataset.ticketId, approve);
+          } catch (error) {
+            setBadge("审批动作失败", "bad");
+            console.error(error);
+          } finally {
+            button.disabled = false;
+          }
+        });
+        el.latestHardFailsList.addEventListener("click", async (event) => {
+          const button = event.target.closest("[data-hard-fail-focus]");
+          if (!button) return;
+          const index = Number(button.dataset.hardFailFocus);
+          const record = state.latestHardFails[index];
+          if (!record) return;
+          try {
+            button.disabled = true;
+            await applyHardFailAuditFilters(record);
+            setBadge("hard-fail 已聚焦到审计筛选", "good");
+            markUpdated();
+          } catch (error) {
+            setBadge("套用 hard-fail 过滤失败", "bad");
+            console.error(error);
+          } finally {
+            button.disabled = false;
+          }
+        });
+      }
+
+      function bootstrap() {
+        loadStoredToken();
+        attachEvents();
+        if (getToken()) {
+          refreshAll();
+        }
+        setInterval(() => {
+          if (document.visibilityState === "visible" && getToken()) {
+            refreshAll();
+          }
+        }, state.autoRefreshMs);
+      }
+
+      bootstrap();
+    </script>
+  </body>
+</html>
