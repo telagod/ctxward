@@ -44,5 +44,5 @@ Pre-release engineering snapshot. Captured here for historical reference; this v
 - Embedded admin console (`/admin`), Prometheus metrics, JSONL audit (no raw PII), `/healthz`, `/readyz`, `/admin/reload`, `/admin/detokenize`.
 - Benchmark matrix harness + regression gate with noise-floor and sample-range overlap suppression.
 
-[Unreleased]: https://github.com/OWNER/ctxward/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/OWNER/ctxward/releases/tag/v0.1.0
+[Unreleased]: https://github.com/telagod/ctxward/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/telagod/ctxward/releases/tag/v0.1.0

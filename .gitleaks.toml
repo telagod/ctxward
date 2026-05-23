@@ -10,6 +10,7 @@ description = "Project-known false positives (test fixtures with synthetic secre
 paths = [
   '''^\.tmp-smoke/''',
   '''^scripts/.*\.sh$''',          # smoke scripts intentionally use demo-secret/admin-secret
+  '''^scripts/bench_harness\.py$''', # bench harness embeds the demo principal SHA-256s
   '''^README\.md$''',              # quickstart shows demo SHA-256 + sample tokenization key
   '''^config/example\.yaml$''',    # demo principals with sha256 of demo-secret/admin-secret
   '''^config/smoke-local\.yaml$''',
@@ -19,6 +20,9 @@ regexes = [
   # Demo principals' secrets used across docs and smoke
   '''demo-secret''',
   '''admin-secret''',
+  # Demo principals' SHA-256 hashes (sha256("demo-secret") / sha256("admin-secret"))
+  '''cd577fe2561ebff23505db0bb006300c7cdecbd46bc0e03c449afafaca2c25bf''',
+  '''16175223c8ddce5ace0493c948569c211b03c4c6bb3d3e484434999448cffe01''',
   # Sample tokenization key from README quickstart (32-byte hex of 0x00..0x1f)
   '''000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f''',
 ]

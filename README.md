@@ -2,11 +2,11 @@
 
 > A privacy gateway for LLM traffic. **Detect → redact → tokenize → review → forward.** Lightweight Rust, transparent reverse proxy, no SDK changes on the caller side.
 
-[![ci](https://github.com/OWNER/ctxward/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/ctxward/actions/workflows/ci.yml)
-[![security](https://github.com/OWNER/ctxward/actions/workflows/security.yml/badge.svg)](https://github.com/OWNER/ctxward/actions/workflows/security.yml)
-[![release](https://github.com/OWNER/ctxward/actions/workflows/release.yml/badge.svg)](https://github.com/OWNER/ctxward/actions/workflows/release.yml)
+[![ci](https://github.com/telagod/ctxward/actions/workflows/ci.yml/badge.svg)](https://github.com/telagod/ctxward/actions/workflows/ci.yml)
+[![security](https://github.com/telagod/ctxward/actions/workflows/security.yml/badge.svg)](https://github.com/telagod/ctxward/actions/workflows/security.yml)
+[![release](https://github.com/telagod/ctxward/actions/workflows/release.yml/badge.svg)](https://github.com/telagod/ctxward/actions/workflows/release.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![image](https://img.shields.io/badge/image-ghcr.io%2Fctxward-informational)](https://github.com/OWNER/ctxward/pkgs/container/ctxward)
+[![image](https://img.shields.io/badge/image-ghcr.io%2Fctxward-informational)](https://github.com/telagod/ctxward/pkgs/container/ctxward)
 
 > ⚠️ **Status: pre-1.0.** Stable internal mechanics, deliberately small public surface. The crate name `context-gurd`, the `CONTEXT_GURD_*` env vars, the `gateway_*` Prometheus names, and the `x-privacy-gateway-*` headers will keep working for the entire 0.x line; renames go through a deprecation cycle. See [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -114,14 +114,14 @@ Detailed scenario list: [`docs/operations/smoke.md`](docs/operations/smoke.md).
 ## Releases & supply chain
 
 - **Binaries**: `linux-x86_64`, `linux-aarch64`, `darwin-arm64`, `darwin-x86_64` — published per tag with SHA-256 sums.
-- **Container**: `ghcr.io/OWNER/ctxward:<version>` — multi-arch (`amd64`/`arm64`), read-only rootfs, non-root, `tini` PID 1, healthcheck.
+- **Container**: `ghcr.io/telagod/ctxward:<version>` — multi-arch (`amd64`/`arm64`), read-only rootfs, non-root, `tini` PID 1, healthcheck.
 - **Provenance**: build-time SLSA provenance attached, **cosign keyless signed**, **CycloneDX SBOM** attested.
 
 Verify before deploying:
 
 ```bash
-cosign verify ghcr.io/OWNER/ctxward:<version> \
-  --certificate-identity-regexp "https://github.com/OWNER/ctxward/.*" \
+cosign verify ghcr.io/telagod/ctxward:<version> \
+  --certificate-identity-regexp "https://github.com/telagod/ctxward/.*" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

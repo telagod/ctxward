@@ -43,9 +43,9 @@ ARG VERSION=0.0.0-dev
 
 LABEL org.opencontainers.image.title="Ctxward" \
       org.opencontainers.image.description="Privacy gateway for LLM traffic — detection, redaction, tokenization, review." \
-      org.opencontainers.image.source="https://github.com/OWNER/ctxward" \
-      org.opencontainers.image.url="https://github.com/OWNER/ctxward" \
-      org.opencontainers.image.documentation="https://github.com/OWNER/ctxward#readme" \
+      org.opencontainers.image.source="https://github.com/telagod/ctxward" \
+      org.opencontainers.image.url="https://github.com/telagod/ctxward" \
+      org.opencontainers.image.documentation="https://github.com/telagod/ctxward#readme" \
       org.opencontainers.image.vendor="Ctxward Contributors" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.revision="${VCS_REF}" \

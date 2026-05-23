@@ -15,7 +15,7 @@ docker compose up --build
 
 健康检查会探测 `/healthz`，read-only rootfs + dropped capabilities 已默认开启。
 
-生产镜像参见 GitHub Release 中的 `ghcr.io/OWNER/ctxward:<tag>`（multi-arch + cosign keyless signed + CycloneDX SBOM attested）。
+生产镜像参见 GitHub Release 中的 `ghcr.io/telagod/ctxward:<tag>`（multi-arch + cosign keyless signed + CycloneDX SBOM attested）。
 
 部署模板：
 
