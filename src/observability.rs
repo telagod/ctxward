@@ -332,21 +332,39 @@ fn metric_family<'a>(
     families: &'a [prometheus::proto::MetricFamily],
     name: &str,
 ) -> Option<&'a prometheus::proto::MetricFamily> {
-    families.iter().find(|family| family.get_name() == name)
+    families.iter().find(|family| family.name() == name)
 }
 
 fn label_value(metric: &prometheus::proto::Metric, name: &str) -> Option<String> {
     metric
         .get_label()
         .iter()
-        .find(|label| label.get_name() == name)
-        .map(|label| label.get_value().to_string())
+        .find(|label| label.name() == name)
+        .map(|label| label.value().to_string())
+}
+
+#[inline]
+fn counter_value_of(metric: &prometheus::proto::Metric) -> f64 {
+    metric
+        .get_counter()
+        .as_ref()
+        .map(|counter| counter.value())
+        .unwrap_or_default()
+}
+
+#[inline]
+fn gauge_value_of(metric: &prometheus::proto::Metric) -> f64 {
+    metric
+        .get_gauge()
+        .as_ref()
+        .map(|gauge| gauge.value())
+        .unwrap_or_default()
 }
 
 fn gauge_value(families: &[prometheus::proto::MetricFamily], name: &str) -> Value {
     let value = metric_family(families, name)
         .and_then(|family| family.get_metric().first())
-        .map(|metric| metric.get_gauge().get_value())
+        .map(gauge_value_of)
         .unwrap_or_default();
     numeric_value(value)
 }
@@ -393,7 +411,7 @@ fn labeled_gauge_value(
                 label_value(metric, label_name).as_deref() == Some(label_value_expected)
             })
         })
-        .map(|metric| metric.get_gauge().get_value())
+        .map(gauge_value_of)
         .unwrap_or_default();
     numeric_value(value)
 }
@@ -407,7 +425,7 @@ fn counter_map_1(
     if let Some(family) = metric_family(families, name) {
         for metric in family.get_metric() {
             if let Some(key) = label_value(metric, label_name) {
-                output.insert(key, numeric_value(metric.get_counter().get_value()));
+                output.insert(key, numeric_value(counter_value_of(metric)));
             }
         }
     }
@@ -435,7 +453,7 @@ fn counter_map_2(
             let Value::Object(child) = entry else {
                 continue;
             };
-            child.insert(key_2, numeric_value(metric.get_counter().get_value()));
+            child.insert(key_2, numeric_value(counter_value_of(metric)));
         }
     }
     Value::Object(output)
@@ -472,7 +490,7 @@ fn counter_map_3(
             let Value::Object(level_2_map) = level_2 else {
                 continue;
             };
-            level_2_map.insert(key_3, numeric_value(metric.get_counter().get_value()));
+            level_2_map.insert(key_3, numeric_value(counter_value_of(metric)));
         }
     }
     Value::Object(output)
