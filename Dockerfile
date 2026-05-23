@@ -25,6 +25,7 @@ ENV CARGO_TERM_COLOR=always \
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY config ./config
+COPY assets ./assets
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \

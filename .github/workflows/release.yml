@@ -42,9 +42,11 @@ jobs:
           - os: macos-14
             target: aarch64-apple-darwin
             archive: tar.gz
-          - os: macos-13
-            target: x86_64-apple-darwin
-            archive: tar.gz
+          # Note: x86_64-apple-darwin removed because GitHub-hosted macos-13
+          # runners are presently queue-throttled for free-tier accounts.
+          # Will be reintroduced once the project moves to a paid plan or a
+          # community-hosted Intel Mac runner is available. Intel macOS users
+          # can build from source via `cargo install --locked --git ...`.
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -100,11 +102,17 @@ jobs:
       - name: Install cargo-cyclonedx
         run: cargo install --locked cargo-cyclonedx
       - name: Generate SBOM
-        run: cargo cyclonedx --format json --output-cdx
+        run: |
+          cargo cyclonedx --format json --all
+          # cargo-cyclonedx writes <crate>.cdx.json next to each Cargo.toml.
+          # Surface them under sbom/ for the artifact.
+          mkdir -p sbom
+          find . -maxdepth 3 -name '*.cdx.json' -exec cp {} sbom/ \;
+          ls -la sbom
       - uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: "**/*.cdx.json"
+          path: sbom/*.cdx.json
 
   # --------------------------------------------------------------------------
   # Multi-arch container image
