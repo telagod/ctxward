@@ -31,9 +31,11 @@ allow = [
   "ISC",
   "Unicode-3.0",
   "Zlib",
-  "MPL-2.0",
-  "CC0-1.0",
   "0BSD",
+  # Required by webpki-roots (pulled in via reqwest -> hyper-rustls).
+  # CDLA-Permissive-2.0 is OSI-permissive; tracked at:
+  # https://cdla.dev/permissive-2-0/
+  "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.93
 exceptions = []
