@@ -4,6 +4,10 @@ All notable changes to **Ctxward** are documented here. Format follows [Keep a C
 
 ## [Unreleased]
 
+_(no changes since the last release)_
+
+## [0.2.0] — 2026-05-23
+
 ### Added
 - Project rebrand from `context-gurd` to **Ctxward** (product/brand surface only; crate name, env vars, and metric names retained for backwards compatibility through the 0.x line).
 - `LICENSE` (MIT), `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `PRIVACY.md`, `NOTICE`, this CHANGELOG.
@@ -44,5 +48,6 @@ Pre-release engineering snapshot. Captured here for historical reference; this v
 - Embedded admin console (`/admin`), Prometheus metrics, JSONL audit (no raw PII), `/healthz`, `/readyz`, `/admin/reload`, `/admin/detokenize`.
 - Benchmark matrix harness + regression gate with noise-floor and sample-range overlap suppression.
 
-[Unreleased]: https://github.com/telagod/ctxward/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/telagod/ctxward/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/telagod/ctxward/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/telagod/ctxward/releases/tag/v0.1.0

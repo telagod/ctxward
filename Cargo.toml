@@ -1,6 +1,6 @@
 [package]
 name = "context-gurd"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "Ctxward — a lightweight Rust privacy gateway for LLM traffic. Detection, redaction, reversible tokenization, review queue, OPA + Presidio integration."
