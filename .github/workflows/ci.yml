@@ -34,6 +34,11 @@ jobs:
     name: bench
     runs-on: ubuntu-latest
     needs: verify
+    # GitHub-hosted runners share hardware; bench latency p95 can hit the
+    # regression gate on noisy neighbours. Until we have a dedicated runner,
+    # bench is informational-only — it still runs and uploads artifacts, but
+    # transient latency failures must not block merges.
+    continue-on-error: true
     concurrency:
       group: context-gurd-bench-${{ github.ref }}
       cancel-in-progress: false
