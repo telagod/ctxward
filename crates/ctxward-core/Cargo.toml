@@ -6,6 +6,16 @@ license = "MIT"
 description = "Ctxward core: detection, redaction, reversible tokenization, policy, and config types — no network/server IO, reusable from the gateway, the desktop shell, and (compiled to WASM) the browser extension."
 rust-version = "1.85"
 
+# rlib for the gateway/desktop; cdylib so the browser extension can
+# `wasm-pack build --features wasm`.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Opt-in WASM bindings for the browser extension. The native gateway build does
+# NOT enable this, so wasm-bindgen is never pulled into the server binary.
+wasm = ["dep:wasm-bindgen"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -20,3 +30,10 @@ aes-gcm-siv = "0.11"
 uuid = { version = "1", features = ["v4", "serde"] }
 parking_lot = "0.12"
 http = "1"
+wasm-bindgen = { version = "0.2", optional = true }
+
+# On wasm32 (browser extension), uuid v4 -> getrandom needs the "js" backend.
+# This target-specific dep is inert for native builds.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+uuid = { version = "1", features = ["v4", "serde", "js"] }

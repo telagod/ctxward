@@ -619,6 +619,7 @@ version = "0.2.0"
 dependencies = [
  "aes-gcm-siv",
  "base64",
+ "getrandom 0.2.17",
  "hex",
  "http",
  "parking_lot",
@@ -630,6 +631,7 @@ dependencies = [
  "thiserror 2.0.18",
  "toml",
  "uuid",
+ "wasm-bindgen",
 ]
 
 [[package]]
