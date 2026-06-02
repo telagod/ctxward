@@ -413,4 +413,10 @@ async fn serve_proxy(state: Arc<AppState>) -> Result<(), AppError> {
 - 审查驳回的(假阳性):whitespace trim、ed25519ph context、response 侧 signs_body(响应不签名)、并发 deadlock(parking_lot guard 不跨 await)、updater panic(无 panic 点)等——经核验均不成立或越界。
 - 残留(已记、非 critical):跨重启 `current_version` 归零 → 旧规则集可重放,但**地板保证核心 provider 不被降级**,故仅影响 operator 自定义的额外 host;版本持久化列为可选 defense-in-depth。snapshot-in-self 修法因 h2 多路复用串号风险**不采纳**,改由地板消除 critical 偏移面。
 
-待续（D4 push 2）:token/成本计量(从拦截 JSON 解析 model+usage → AuditRecord/metrics)、retention 轮转、桌面成本看板(需 Tauri)。cosign keyless 作为可选第二签验通道(当前 ed25519 自包含、可在 Rust 内验,比 cosign 在无工具环境更可验)。
+token/成本计量(留存钩子后端)已落地:
+- `src/mitm/usage.rs` — 从拦截 JSON 解析 model(请求)+ usage(响应),兼容 OpenAI(`prompt_tokens`/`completion_tokens`)与 Anthropic(`input_tokens`/`output_tokens`),best-effort 不报错。5 单测。
+- `src/observability.rs` — 新增 `gateway_llm_requests_total{model}` + `gateway_llm_tokens_total{model,kind}` 计数器,并入 `/metrics` 与 admin `snapshot()`(成本看板数据源)。
+- handler:请求记 `llm_request(model)`,(非流式)响应记 `llm_tokens(model,prompt,completion)`;e2e 断言 gpt-test 请求计数 + prompt=11/completion=7。
+- 限制:流式(SSE)响应当前透传不缓冲,尾部 usage 不计量(随 D1.5 SSE 处理补)。
+
+待续:retention 轮转、桌面成本看板 UI(需 Tauri)、D1.5 SSE 流式脱敏+计量。cosign keyless 作为可选第二签验通道(当前 ed25519 自包含、可在 Rust 内验,比 cosign 在无工具环境更可验)。

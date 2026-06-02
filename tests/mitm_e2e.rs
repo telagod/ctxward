@@ -26,7 +26,7 @@ async fn echo(State(captured): State<Arc<Mutex<Vec<u8>>>>, body: Bytes) -> impl 
     *captured.lock().unwrap() = body.to_vec();
     (
         [(axum::http::header::CONTENT_TYPE, "application/json")],
-        r#"{"reply":"please contact agent@corp.example for help"}"#,
+        r#"{"model":"gpt-test","reply":"please contact agent@corp.example for help","usage":{"prompt_tokens":11,"completion_tokens":7}}"#,
     )
 }
 
@@ -97,6 +97,7 @@ async fn mitm_redacts_request_and_response_and_blocks_phone() {
 
     let (state, _temp_guard) = build_proxy_state(proxy_port, "");
     let audit = state.audit_store.clone();
+    let metrics = state.metrics.clone();
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     let proxy_task = tokio::spawn(async move {
         context_gurd::proxy_mode::run_proxy(state, async move {
@@ -115,7 +116,7 @@ async fn mitm_redacts_request_and_response_and_blocks_phone() {
     let resp = client
         .post(format!("http://{stub_addr}/v1/chat"))
         .header("content-type", "application/json")
-        .body(r#"{"messages":[{"role":"user","content":"email me at zhangsan@corp.example"}]}"#)
+        .body(r#"{"model":"gpt-test","messages":[{"role":"user","content":"email me at zhangsan@corp.example"}]}"#)
         .send()
         .await
         .expect("request through proxy");
@@ -163,6 +164,30 @@ async fn mitm_redacts_request_and_response_and_blocks_phone() {
             .iter()
             .any(|r| r.direction == "request" && r.decision == "block"),
         "MITM path must emit an audit record for the blocked phone request"
+    );
+
+    // --- 4. token/cost metering: request model + response usage counted ---
+    let snap = metrics.snapshot();
+    assert!(
+        snap["counters"]["llm_requests_total"]["gpt-test"]
+            .as_u64()
+            .unwrap_or(0)
+            >= 1,
+        "llm_requests_total should count the gpt-test request: {snap}"
+    );
+    assert_eq!(
+        snap["counters"]["llm_tokens_total"]["gpt-test"]["prompt"]
+            .as_u64()
+            .unwrap_or(0),
+        11,
+        "prompt tokens metered from the response usage object"
+    );
+    assert_eq!(
+        snap["counters"]["llm_tokens_total"]["gpt-test"]["completion"]
+            .as_u64()
+            .unwrap_or(0),
+        7,
+        "completion tokens metered from the response usage object"
     );
 
     let _ = tx.send(());
