@@ -1,0 +1,31 @@
+# Standalone workspace so the root `cargo build`/CI (which has no GUI/webkit
+# toolchain) never tries to build the Tauri shell. Build this crate explicitly
+# from `desktop/` with the Tauri toolchain installed (see desktop/README.md).
+[workspace]
+
+[package]
+name = "ctxward-desktop"
+version = "0.2.0"
+edition = "2024"
+description = "Ctxward Desktop — Clash-style transparent LLM-privacy gateway (Tauri shell)"
+license = "MIT"
+
+[lib]
+name = "ctxward_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Reuse the gateway kernel: detection/redaction pipeline, MITM proxy, CA, and
+# the per-OS platform command layer all live in the existing crate.
+context-gurd = { path = "../.." }
+
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "rt-multi-thread"] }
+parking_lot = "0.12"
+tracing = "0.1"
