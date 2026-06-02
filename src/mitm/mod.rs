@@ -9,6 +9,7 @@ pub mod bridge;
 pub mod ca;
 pub mod classify;
 pub mod ruleset;
+pub mod sse;
 pub mod usage;
 
 use std::sync::Arc;
@@ -205,12 +206,22 @@ impl HttpHandler for CtxwardHandler {
             .and_then(|v| v.to_str().ok())
             .map(|s| s.to_owned());
 
-        // D1: streaming (SSE) responses are passed through untouched. The core
-        // privacy goal — scrubbing *outbound request* bodies — is unaffected
-        // (requests are not streamed). Response-side per-event redaction via
-        // `crate::proxy::transform_sse_line` is wired in D1.5.
+        // D1.5: streaming (SSE) responses are scrubbed per-event as they flow.
+        // Honours the same `response_filtering.scan_sse` switch as the reverse
+        // proxy; when disabled, the stream is passed through untouched.
         if is_sse(content_type.as_deref()) {
-            return res;
+            let rt = &self.runtime.config.response_filtering;
+            if !rt.enabled || !rt.scan_sse {
+                return res;
+            }
+            let (parts, body) = res.into_parts();
+            let redacted = sse::redact_sse_stream(
+                self.runtime.clone(),
+                self.metrics.clone(),
+                self.principal.clone(),
+                body,
+            );
+            return Response::from_parts(parts, redacted);
         }
 
         let res = match decode_response(res) {

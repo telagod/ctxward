@@ -1402,12 +1402,12 @@ async fn response_from_sse_stream(
     response
 }
 
-struct SseTransformResult {
-    line: String,
-    policy: PolicyOutcome,
+pub(crate) struct SseTransformResult {
+    pub(crate) line: String,
+    pub(crate) policy: PolicyOutcome,
 }
 
-async fn transform_sse_line(
+pub(crate) async fn transform_sse_line(
     runtime: &RuntimeState,
     principal: &Principal,
     path: &str,
@@ -1766,7 +1766,10 @@ fn generic_redacted_sse_payload(is_json_payload: bool) -> String {
     }
 }
 
-fn merge_policy_outcomes(mut current: PolicyOutcome, mut next: PolicyOutcome) -> PolicyOutcome {
+pub(crate) fn merge_policy_outcomes(
+    mut current: PolicyOutcome,
+    mut next: PolicyOutcome,
+) -> PolicyOutcome {
     let current_rank = current.decision.rank();
     let next_rank = next.decision.rank();
     let next_is_more_relevant = next_rank > current_rank
