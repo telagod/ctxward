@@ -494,6 +494,11 @@ pub struct ProxyConfig {
     /// Action for SNI matching neither list. Defaults to passthrough (fail-open).
     #[serde(default)]
     pub default_action: ProxyAction,
+    /// Hosts whose upstream-signed request body must not be modified (e.g. AWS
+    /// SigV4): intercepted for detection/audit, but the request body is never
+    /// redacted (that would invalidate the signature → 4xx).
+    #[serde(default = "default_signs_body_hosts")]
+    pub signs_body: Vec<HostPattern>,
     #[serde(default)]
     pub per_app_rules: Vec<PerAppRule>,
     #[serde(default)]
@@ -501,6 +506,10 @@ pub struct ProxyConfig {
     /// Optional signed, hot-updatable remote rule-set (D4).
     #[serde(default)]
     pub ruleset_url: Option<String>,
+    /// Hex-encoded ed25519 public key that signs the remote rule-set. Required
+    /// for `ruleset_url` to take effect (unverified feeds are rejected).
+    #[serde(default)]
+    pub ruleset_pubkey: Option<String>,
     #[serde(default = "default_ruleset_poll_secs")]
     pub ruleset_poll_secs: u64,
 }
@@ -582,7 +591,11 @@ fn default_pin_block_ttl_secs() -> u64 {
 }
 
 /// Baked-in offline fallback intercept list (LLM provider API hostnames).
-fn default_intercept_hosts() -> Vec<HostPattern> {
+///
+/// Also used as the **immutable floor** for hot-updated rule-sets: these hosts
+/// are always intercepted, so a rolled-back, minimal, or hijacked-but-signed
+/// rule-set can never stop scanning the core providers.
+pub(crate) fn default_intercept_hosts() -> Vec<HostPattern> {
     vec![
         HostPattern::Exact("api.openai.com".into()),
         HostPattern::Wildcard("*.openai.azure.com".into()),
@@ -591,10 +604,10 @@ fn default_intercept_hosts() -> Vec<HostPattern> {
         HostPattern::Exact("api.anthropic.com".into()),
         HostPattern::Exact("generativelanguage.googleapis.com".into()),
         HostPattern::Exact("aiplatform.googleapis.com".into()),
-        // NOTE: AWS Bedrock (bedrock-runtime.*) signs the request body with SigV4.
-        // Redacting the body invalidates the signature → 403. Until D4 adds the
-        // `signs_body` flag + intercept-but-passthrough-on-modify, Bedrock is
-        // shipped as passthrough (see default_passthrough_hosts).
+        // AWS Bedrock (bedrock-runtime.*) signs the request body with SigV4, so
+        // it is also listed in `default_signs_body_hosts`: intercepted for
+        // detection/audit but with the request body preserved (never redacted).
+        HostPattern::Regex(r"^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$".into()),
         HostPattern::Exact("api.deepseek.com".into()),
         HostPattern::Exact("api.moonshot.ai".into()),
         HostPattern::Exact("api.moonshot.cn".into()),
@@ -621,9 +634,19 @@ fn default_passthrough_hosts() -> Vec<HostPattern> {
         HostPattern::Wildcard("*.claude.com".into()),
         HostPattern::Exact("gemini.google.com".into()),
         HostPattern::Exact("aistudio.google.com".into()),
-        // SigV4 body-signing: redaction would break the signature (403). Intercept
-        // with body-preservation lands in D4 via the `signs_body` flag.
+    ]
+}
+
+/// Hosts whose upstream-signed request body must be preserved (intercept for
+/// detection/audit, never redact the request body).
+///
+/// Also the immutable signs_body floor for hot-updated rule-sets: a rule-set
+/// can add signs_body hosts but can never drop a baked-in one (so e.g. Bedrock
+/// stays signature-safe regardless of the feed).
+pub(crate) fn default_signs_body_hosts() -> Vec<HostPattern> {
+    vec![
         HostPattern::Regex(r"^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$".into()),
+        HostPattern::Regex(r"^bedrock-mantle\.[a-z0-9-]+\.api\.aws$".into()),
     ]
 }
 

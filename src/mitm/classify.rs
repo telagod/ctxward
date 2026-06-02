@@ -59,40 +59,91 @@ impl Matcher {
     }
 }
 
-/// Compiled classifier for one [`ProxyConfig`].
+/// Compile a list of host patterns, skipping (with a warning) any that fail to
+/// compile rather than failing the whole proxy.
+fn compile_all(patterns: &[HostPattern]) -> Vec<Matcher> {
+    patterns
+        .iter()
+        .filter_map(|p| match Matcher::compile(p) {
+            Ok(m) => Some(m),
+            Err(err) => {
+                tracing::warn!(?p, %err, "skipping invalid host pattern");
+                None
+            }
+        })
+        .collect()
+}
+
+/// Compiled SNI classifier. Built from static config or a signed rule-set, and
+/// hot-swapped at runtime when a new rule-set arrives.
 pub struct Classifier {
+    /// Immutable intercept floor: always intercepted, wins over `passthrough`.
+    /// Empty for the static-config path (the operator's config is authoritative);
+    /// the baked-in provider list on the rule-set path, so a rolled-back/minimal/
+    /// hijacked-but-signed rule-set can never stop scanning the core providers.
+    floor_intercept: Vec<Matcher>,
     intercept: Vec<Matcher>,
     passthrough: Vec<Matcher>,
     default: ProxyAction,
+    /// Hosts whose upstream-signed request body must not be modified.
+    signs_body: Vec<Matcher>,
 }
 
 impl Classifier {
-    /// Compile a classifier from config. Invalid regexes are skipped with a warning
-    /// rather than failing the whole proxy.
-    pub fn from_config(cfg: &ProxyConfig) -> Self {
-        let compile_all = |patterns: &[HostPattern]| -> Vec<Matcher> {
-            patterns
-                .iter()
-                .filter_map(|p| match Matcher::compile(p) {
-                    Ok(m) => Some(m),
-                    Err(err) => {
-                        tracing::warn!(?p, %err, "skipping invalid host pattern");
-                        None
-                    }
-                })
-                .collect()
-        };
+    fn new(
+        floor_intercept: &[HostPattern],
+        intercept: &[HostPattern],
+        passthrough: &[HostPattern],
+        default: ProxyAction,
+        signs_body: &[HostPattern],
+    ) -> Self {
         Self {
-            intercept: compile_all(&cfg.intercept),
-            passthrough: compile_all(&cfg.passthrough),
-            default: cfg.default_action,
+            floor_intercept: compile_all(floor_intercept),
+            intercept: compile_all(intercept),
+            passthrough: compile_all(passthrough),
+            default,
+            signs_body: compile_all(signs_body),
         }
     }
 
-    /// Decide the action for a host. Passthrough wins ties (fail-open / least-surprise),
-    /// then intercept, then the configured default for unknown hosts.
+    /// Compile a classifier from static proxy config. No floor — the operator's
+    /// config is authoritative (they may intercept or passthrough anything).
+    pub fn from_config(cfg: &ProxyConfig) -> Self {
+        Self::new(
+            &[],
+            &cfg.intercept,
+            &cfg.passthrough,
+            cfg.default_action,
+            &cfg.signs_body,
+        )
+    }
+
+    /// Compile a classifier from a verified rule-set (hot-update path).
+    ///
+    /// The baked-in defaults are an immutable floor: the rule-set's lists are
+    /// UNIONed with them for intercept/signs_body, and the baked-in intercept
+    /// hosts always win over any rule-set passthrough. A rule-set can therefore
+    /// only ADD protection, never remove a baked-in provider's interception.
+    pub fn from_ruleset(rs: &crate::mitm::ruleset::Ruleset) -> Self {
+        let floor_intercept = crate::config::default_intercept_hosts();
+        let mut signs_body = crate::config::default_signs_body_hosts();
+        signs_body.extend(rs.signs_body.iter().cloned());
+        Self::new(
+            &floor_intercept,
+            &rs.intercept,
+            &rs.passthrough,
+            rs.default_action,
+            &signs_body,
+        )
+    }
+
+    /// Decide the action for a host. The immutable intercept floor wins first,
+    /// then passthrough, then intercept, then the configured default.
     pub fn classify(&self, host: &str) -> ProxyAction {
         let host = host.trim_end_matches('.').to_ascii_lowercase();
+        if self.floor_intercept.iter().any(|m| m.matches(&host)) {
+            return ProxyAction::Intercept;
+        }
         if self.passthrough.iter().any(|m| m.matches(&host)) {
             return ProxyAction::Passthrough;
         }
@@ -100,6 +151,13 @@ impl Classifier {
             return ProxyAction::Intercept;
         }
         self.default
+    }
+
+    /// Whether this host's upstream-signed request body must be preserved
+    /// (intercept for detection/audit, but never redact the request body).
+    pub fn signs_body(&self, host: &str) -> bool {
+        let host = host.trim_end_matches('.').to_ascii_lowercase();
+        self.signs_body.iter().any(|m| m.matches(&host))
     }
 }
 
@@ -162,9 +220,11 @@ mod tests {
             intercept,
             passthrough,
             default_action: default,
+            signs_body: vec![],
             per_app_rules: vec![],
             pin_fallback: PinFallbackConfig::default(),
             ruleset_url: None,
+            ruleset_pubkey: None,
             ruleset_poll_secs: 300,
         }
     }
@@ -211,6 +271,82 @@ mod tests {
         assert_eq!(
             c.classify("s3.us-east-1.amazonaws.com"),
             ProxyAction::Passthrough
+        );
+    }
+
+    #[test]
+    fn signs_body_matches_independently_of_intercept() {
+        let mut c = cfg(
+            vec![HostPattern::Regex(
+                r"^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$".into(),
+            )],
+            vec![],
+            ProxyAction::Passthrough,
+        );
+        c.signs_body = vec![HostPattern::Regex(
+            r"^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$".into(),
+        )];
+        let classifier = Classifier::from_config(&c);
+        // Bedrock is intercepted (scanned) AND flagged signs_body (body preserved).
+        assert_eq!(
+            classifier.classify("bedrock-runtime.us-east-1.amazonaws.com"),
+            ProxyAction::Intercept
+        );
+        assert!(classifier.signs_body("bedrock-runtime.us-east-1.amazonaws.com"));
+        assert!(!classifier.signs_body("api.openai.com"));
+    }
+
+    #[test]
+    fn from_ruleset_builds_classifier() {
+        use crate::mitm::ruleset::Ruleset;
+        let rs = Ruleset {
+            version: 1,
+            intercept: vec![HostPattern::Exact("api.openai.com".into())],
+            passthrough: vec![HostPattern::Exact("claude.ai".into())],
+            default_action: ProxyAction::Passthrough,
+            signs_body: vec![],
+        };
+        let c = Classifier::from_ruleset(&rs);
+        assert_eq!(c.classify("api.openai.com"), ProxyAction::Intercept);
+        assert_eq!(c.classify("claude.ai"), ProxyAction::Passthrough);
+    }
+
+    #[test]
+    fn ruleset_floor_keeps_baked_in_providers_intercepted() {
+        use crate::mitm::ruleset::Ruleset;
+        // An empty/minimal signed rule-set must NOT stop scanning the core
+        // providers — the baked-in defaults are an immutable floor.
+        let empty = Ruleset {
+            version: 99,
+            intercept: vec![],
+            passthrough: vec![],
+            default_action: ProxyAction::Passthrough,
+            signs_body: vec![],
+        };
+        let c = Classifier::from_ruleset(&empty);
+        assert_eq!(c.classify("api.openai.com"), ProxyAction::Intercept);
+        assert_eq!(c.classify("api.anthropic.com"), ProxyAction::Intercept);
+        // Bedrock stays signature-safe regardless of the feed.
+        assert!(c.signs_body("bedrock-runtime.us-east-1.amazonaws.com"));
+    }
+
+    #[test]
+    fn ruleset_cannot_passthrough_a_baked_in_provider() {
+        use crate::mitm::ruleset::Ruleset;
+        // A (signed) rule-set tries to disable OpenAI interception by listing it
+        // as passthrough; the floor must win.
+        let rs = Ruleset {
+            version: 5,
+            intercept: vec![],
+            passthrough: vec![HostPattern::Exact("api.openai.com".into())],
+            default_action: ProxyAction::Passthrough,
+            signs_body: vec![],
+        };
+        let c = Classifier::from_ruleset(&rs);
+        assert_eq!(
+            c.classify("api.openai.com"),
+            ProxyAction::Intercept,
+            "baked-in intercept floor must win over a rule-set passthrough"
         );
     }
 
