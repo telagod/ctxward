@@ -30,10 +30,23 @@ async fn echo(State(captured): State<Arc<Mutex<Vec<u8>>>>, body: Bytes) -> impl 
     )
 }
 
+/// SSE stub: streams events with PII in a delta plus a trailing usage event.
+async fn sse_echo() -> impl IntoResponse {
+    let body = "data: {\"choices\":[{\"delta\":{\"content\":\"my email is leak@corp.example\"}}]}\n\n\
+data: {\"choices\":[{\"delta\":{\"content\":\" bye\"}}]}\n\n\
+data: {\"model\":\"gpt-test\",\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":9}}\n\n\
+data: [DONE]\n\n";
+    (
+        [(axum::http::header::CONTENT_TYPE, "text/event-stream")],
+        body,
+    )
+}
+
 async fn start_echo_stub() -> (SocketAddr, Arc<Mutex<Vec<u8>>>) {
     let captured = Arc::new(Mutex::new(Vec::new()));
     let app = Router::new()
         .route("/v1/chat", post(echo))
+        .route("/v1/sse", post(sse_echo))
         .with_state(captured.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -188,6 +201,69 @@ async fn mitm_redacts_request_and_response_and_blocks_phone() {
             .unwrap_or(0),
         7,
         "completion tokens metered from the response usage object"
+    );
+
+    let _ = tx.send(());
+    let _ = proxy_task.await;
+}
+
+/// D1.5: streaming (SSE) responses are scrubbed per-event as they flow, and the
+/// trailing usage event is metered.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn mitm_redacts_sse_stream_and_meters_usage() {
+    let (stub_addr, _captured) = start_echo_stub().await;
+    let proxy_port = free_port();
+    let proxy_addr: SocketAddr = format!("127.0.0.1:{proxy_port}").parse().unwrap();
+
+    let (state, _temp_guard) = build_proxy_state(proxy_port, "");
+    let metrics = state.metrics.clone();
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let proxy_task = tokio::spawn(async move {
+        context_gurd::proxy_mode::run_proxy(state, async move {
+            let _ = rx.await;
+        })
+        .await
+    });
+    wait_until_listening(proxy_addr).await;
+
+    let client = reqwest::Client::builder()
+        .proxy(reqwest::Proxy::http(format!("http://{proxy_addr}")).unwrap())
+        .build()
+        .unwrap();
+
+    let resp = client
+        .post(format!("http://{stub_addr}/v1/sse"))
+        .body("{\"model\":\"gpt-test\",\"stream\":true}")
+        .send()
+        .await
+        .expect("sse request through proxy");
+    assert_eq!(resp.status(), 200);
+    let sse_body = resp.text().await.unwrap();
+
+    // PII inside the streamed delta must be scrubbed before the client sees it.
+    assert!(
+        !sse_body.contains("leak@corp.example"),
+        "SSE event PII must be redacted in-stream, got: {sse_body}"
+    );
+    // SSE framing preserved (still has data: events and the terminal marker).
+    assert!(sse_body.contains("data:"), "SSE framing preserved");
+    assert!(sse_body.contains("[DONE]"), "terminal event preserved");
+
+    // Trailing usage event metered.
+    let snap = metrics.snapshot();
+    assert_eq!(
+        snap["counters"]["llm_tokens_total"]["gpt-test"]["prompt"]
+            .as_u64()
+            .unwrap_or(0),
+        5,
+        "prompt tokens metered from the SSE usage event: {snap}"
+    );
+    assert_eq!(
+        snap["counters"]["llm_tokens_total"]["gpt-test"]["completion"]
+            .as_u64()
+            .unwrap_or(0),
+        9,
+        "completion tokens metered from the SSE usage event"
     );
 
     let _ = tx.send(());
