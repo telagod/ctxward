@@ -1,21 +1,19 @@
+// The detection / redaction / tokenization / policy engine and config types
+// live in the IO-free `ctxward-core` crate. Re-export them here so the gateway's
+// existing `crate::types::…`, `crate::config::…`, etc. paths keep resolving and
+// both shells share one source of truth.
+pub use ctxward_core::{auth, config, detect, policy, redact, session, tokenize, types};
+
 pub mod admin_ui;
 pub mod app;
 pub mod attachments;
 pub mod audit;
-pub mod auth;
 pub mod benchmarks;
-pub mod config;
-pub mod detect;
 pub mod mitm;
 pub mod observability;
 pub mod opa;
 pub mod platform;
-pub mod policy;
 pub mod presidio;
 pub mod proxy;
 pub mod proxy_mode;
-pub mod redact;
 pub mod review;
-pub mod session;
-pub mod tokenize;
-pub mod types;

@@ -23,6 +23,7 @@ ENV CARGO_TERM_COLOR=always \
     RUSTFLAGS="-C link-arg=-s"
 
 COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
 COPY src ./src
 COPY config ./config
 COPY assets ./assets

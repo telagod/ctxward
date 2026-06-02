@@ -1,10 +1,10 @@
 .PHONY: test clippy smoke-admin smoke-session-correlation smoke-builtin-block smoke-builtin-regex smoke-pdf smoke-ooxml smoke-presidio smoke-presidio-fail smoke-attachment-presidio-fail smoke-response-json smoke-sse smoke-sse-fail smoke-bench-drift smoke-bench-gate bench-smoke bench-matrix bench-gate bench-ci bench-promote smoke-all
 
 test:
-	cargo test -q
+	cargo test -q --workspace
 
 clippy:
-	cargo clippy --all-targets --all-features -- -D warnings
+	cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 smoke-admin:
 	bash ./scripts/smoke-admin.sh

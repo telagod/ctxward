@@ -494,6 +494,7 @@ dependencies = [
  "base64",
  "bytes",
  "chrono",
+ "ctxward-core",
  "ed25519-dalek",
  "futures-util",
  "hex",
@@ -610,6 +611,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0369ee1ad671834580515889b80f2ea915f23b8be8d0daa4bbaf2ac5c7590835"
 dependencies = [
  "cipher",
+]
+
+[[package]]
+name = "ctxward-core"
+version = "0.2.0"
+dependencies = [
+ "aes-gcm-siv",
+ "base64",
+ "hex",
+ "http",
+ "parking_lot",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "thiserror 2.0.18",
+ "toml",
+ "uuid",
 ]
 
 [[package]]

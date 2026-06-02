@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use axum::http::{HeaderMap, HeaderName, header::AUTHORIZATION};
 use hex::ToHex;
+use http::{HeaderMap, HeaderName, header::AUTHORIZATION};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
