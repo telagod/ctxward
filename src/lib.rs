@@ -9,6 +9,7 @@ pub mod detect;
 pub mod mitm;
 pub mod observability;
 pub mod opa;
+pub mod platform;
 pub mod policy;
 pub mod presidio;
 pub mod proxy;
