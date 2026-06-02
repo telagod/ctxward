@@ -11,6 +11,7 @@ pub mod config;
 pub mod detect;
 pub mod policy;
 pub mod redact;
+pub mod redact_api;
 pub mod session;
 pub mod tokenize;
 pub mod types;

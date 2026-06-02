@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "name": "email",
+      "label": "email",
+      "pattern": "(?i)(?:^|[^A-Z0-9._%+-])([A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,})(?:$|[^A-Z0-9._%+-])",
+      "severity": "medium",
+      "authorized_action": "allow",
+      "unauthorized_action": "redact",
+      "min_clearance": "internal",
+      "masking": "partial_email"
+    },
+    {
+      "name": "phone_cn",
+      "label": "phone",
+      "pattern": "(?:^|[^0-9])(1[3-9]\\d{9})(?:$|[^0-9])",
+      "severity": "high",
+      "authorized_action": "allow",
+      "unauthorized_action": "redact",
+      "min_clearance": "confidential",
+      "masking": "partial_phone"
+    },
+    {
+      "name": "bank_card",
+      "label": "bank_card",
+      "pattern": "(?:^|[^0-9])(\\d{16,19})(?:$|[^0-9])",
+      "severity": "high",
+      "authorized_action": "allow",
+      "unauthorized_action": "redact",
+      "min_clearance": "confidential",
+      "masking": "keep_last4"
+    }
+  ]
+}

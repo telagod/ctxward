@@ -39,3 +39,6 @@ coverage/
 
 # --- Local bench / benchmark scratch ---
 /.tmp-bench
+
+# wasm-pack output for the browser extension (generated)
+ext/pkg/
