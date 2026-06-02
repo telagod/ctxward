@@ -71,6 +71,14 @@ pub enum AppError {
     Bind(std::io::Error),
     #[error("server failed: {0}")]
     Serve(std::io::Error),
+    #[error("mode is proxy but no proxy config was provided")]
+    ProxyConfigMissing,
+    #[error("invalid proxy listen address {0}")]
+    ProxyListenAddr(String),
+    #[error(transparent)]
+    Ca(#[from] crate::mitm::ca::CaError),
+    #[error("proxy server failed: {0}")]
+    Proxy(hudsucker::Error),
 }
 
 #[derive(Clone)]
@@ -363,11 +371,17 @@ fn dependency_status_code(status: &serde_json::Value) -> Option<i64> {
 pub async fn run(config_path: PathBuf) -> Result<(), AppError> {
     init_tracing();
     let state = build_state(config_path)?;
+    crate::proxy_mode::serve(state).await
+}
+
+/// Serve the reverse-proxy (axum) data plane. This is the compat shell; the
+/// transparent MITM proxy lives in [`crate::proxy_mode`].
+pub async fn serve_reverse(state: Arc<AppState>) -> Result<(), AppError> {
     let bind = state.current().config.server.bind.clone();
     let listener = tokio::net::TcpListener::bind(&bind)
         .await
         .map_err(AppError::Bind)?;
-    tracing::info!(bind = %bind, "context-gurd listening");
+    tracing::info!(bind = %bind, "context-gurd listening (reverse mode)");
     axum::serve(listener, build_router(state))
         .await
         .map_err(|err| AppError::Serve(std::io::Error::other(err)))

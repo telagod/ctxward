@@ -31,6 +31,9 @@ pub enum ConfigError {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AppConfig {
+    /// Operating mode. Defaults to `Reverse` so every existing config keeps working.
+    #[serde(default)]
+    pub mode: Mode,
     pub server: ServerConfig,
     pub upstream: UpstreamConfig,
     pub auth: AuthConfig,
@@ -48,6 +51,20 @@ pub struct AppConfig {
     #[serde(default)]
     pub benchmarks: BenchmarkConfig,
     pub audit: AuditConfig,
+    /// Transparent forward MITM proxy settings. Activated when `mode = proxy`.
+    #[serde(default)]
+    pub proxy: Option<ProxyConfig>,
+}
+
+/// How the gateway accepts traffic.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    /// Existing axum reverse proxy: callers point their base URL at us (compat shell).
+    #[default]
+    Reverse,
+    /// Transparent forward MITM proxy: intercept LLM traffic system-wide (main line).
+    Proxy,
 }
 
 impl AppConfig {
@@ -446,9 +463,173 @@ fn default_audit_buffer_capacity() -> usize {
     1000
 }
 
+/// Transparent forward MITM proxy configuration (mode = proxy).
+///
+/// Only LLM-provider SNI in `intercept` are TLS-terminated and run through the
+/// detection/redaction pipeline; everything else is an opaque passthrough tunnel.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProxyConfig {
+    #[serde(default = "default_proxy_listen_addr")]
+    pub listen_addr: String,
+    /// Directory holding the local root CA. Key is generated on first run, chmod 600, never exported.
+    #[serde(default = "default_ca_dir")]
+    pub ca_dir: String,
+    #[serde(default)]
+    pub ca_key_path: Option<String>,
+    #[serde(default)]
+    pub ca_cert_path: Option<String>,
+    /// Env var that overrides the CA key path, mirroring the tokenization key-env convention.
+    #[serde(default = "default_ca_key_path_env")]
+    pub ca_key_path_env: String,
+    #[serde(default = "default_leaf_ttl_days")]
+    pub leaf_ttl_days: u32,
+    #[serde(default = "default_cert_cache_size")]
+    pub cert_cache_size: u64,
+    /// Tier-1 allowlist: hosts to TLS-terminate and run the pipeline on.
+    #[serde(default = "default_intercept_hosts")]
+    pub intercept: Vec<HostPattern>,
+    /// Tier-2 explicit passthrough: web chat, auth flows, known cert-pinned apps.
+    #[serde(default = "default_passthrough_hosts")]
+    pub passthrough: Vec<HostPattern>,
+    /// Action for SNI matching neither list. Defaults to passthrough (fail-open).
+    #[serde(default)]
+    pub default_action: ProxyAction,
+    #[serde(default)]
+    pub per_app_rules: Vec<PerAppRule>,
+    #[serde(default)]
+    pub pin_fallback: PinFallbackConfig,
+    /// Optional signed, hot-updatable remote rule-set (D4).
+    #[serde(default)]
+    pub ruleset_url: Option<String>,
+    #[serde(default = "default_ruleset_poll_secs")]
+    pub ruleset_poll_secs: u64,
+}
+
+/// A host-matching rule for the intercept/passthrough lists.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
+pub enum HostPattern {
+    /// Exact host match, e.g. `api.openai.com`.
+    Exact(String),
+    /// Single-level wildcard, e.g. `*.openai.azure.com`.
+    Wildcard(String),
+    /// Anchored regex over the full host, e.g. `^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$`.
+    Regex(String),
+}
+
+/// What to do with an intercepted connection.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProxyAction {
+    /// TLS-terminate and run the detection/redaction pipeline.
+    Intercept,
+    /// Opaque TCP tunnel: no cert signed, no decrypt, zero privacy contact.
+    #[default]
+    Passthrough,
+}
+
+/// Per-client-process rule override (best-effort process attribution).
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct PerAppRule {
+    pub process: String,
+    pub action: ProxyAction,
+}
+
+/// Behaviour when a client rejects our leaf cert (cert-pinned target).
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct PinFallbackConfig {
+    #[serde(default = "default_pin_block_ttl_secs")]
+    pub block_ttl_secs: u64,
+    #[serde(default = "default_true")]
+    pub auto_splice_on_alert: bool,
+}
+
+impl Default for PinFallbackConfig {
+    fn default() -> Self {
+        Self {
+            block_ttl_secs: default_pin_block_ttl_secs(),
+            auto_splice_on_alert: true,
+        }
+    }
+}
+
+fn default_proxy_listen_addr() -> String {
+    "127.0.0.1:8888".to_string()
+}
+
+fn default_ca_dir() -> String {
+    "./certs".to_string()
+}
+
+fn default_ca_key_path_env() -> String {
+    "CONTEXT_GURD_PROXY_CA_KEY_PATH".to_string()
+}
+
+fn default_leaf_ttl_days() -> u32 {
+    7
+}
+
+fn default_cert_cache_size() -> u64 {
+    1000
+}
+
+fn default_ruleset_poll_secs() -> u64 {
+    300
+}
+
+fn default_pin_block_ttl_secs() -> u64 {
+    300
+}
+
+/// Baked-in offline fallback intercept list (LLM provider API hostnames).
+fn default_intercept_hosts() -> Vec<HostPattern> {
+    vec![
+        HostPattern::Exact("api.openai.com".into()),
+        HostPattern::Wildcard("*.openai.azure.com".into()),
+        HostPattern::Wildcard("*.cognitiveservices.azure.com".into()),
+        HostPattern::Wildcard("*.services.ai.azure.com".into()),
+        HostPattern::Exact("api.anthropic.com".into()),
+        HostPattern::Exact("generativelanguage.googleapis.com".into()),
+        HostPattern::Exact("aiplatform.googleapis.com".into()),
+        // NOTE: AWS Bedrock (bedrock-runtime.*) signs the request body with SigV4.
+        // Redacting the body invalidates the signature → 403. Until D4 adds the
+        // `signs_body` flag + intercept-but-passthrough-on-modify, Bedrock is
+        // shipped as passthrough (see default_passthrough_hosts).
+        HostPattern::Exact("api.deepseek.com".into()),
+        HostPattern::Exact("api.moonshot.ai".into()),
+        HostPattern::Exact("api.moonshot.cn".into()),
+        HostPattern::Exact("api.groq.com".into()),
+        HostPattern::Exact("api.mistral.ai".into()),
+        HostPattern::Exact("api.cohere.com".into()),
+        HostPattern::Exact("api.x.ai".into()),
+        HostPattern::Exact("openrouter.ai".into()),
+    ]
+}
+
+/// Baked-in offline fallback passthrough list (web chat / auth / pinned apps).
+fn default_passthrough_hosts() -> Vec<HostPattern> {
+    vec![
+        HostPattern::Exact("chatgpt.com".into()),
+        HostPattern::Wildcard("*.chatgpt.com".into()),
+        HostPattern::Exact("chat.openai.com".into()),
+        HostPattern::Wildcard("*.auth0.com".into()),
+        HostPattern::Exact("challenges.cloudflare.com".into()),
+        HostPattern::Exact("desktop.chat.openai.com".into()),
+        HostPattern::Exact("ios.chat.openai.com".into()),
+        HostPattern::Exact("android.chat.openai.com".into()),
+        HostPattern::Exact("claude.ai".into()),
+        HostPattern::Wildcard("*.claude.com".into()),
+        HostPattern::Exact("gemini.google.com".into()),
+        HostPattern::Exact("aistudio.google.com".into()),
+        // SigV4 body-signing: redaction would break the signature (403). Intercept
+        // with body-preservation lands in D4 via the `signs_body` flag.
+        HostPattern::Regex(r"^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$".into()),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
-    use super::AppConfig;
+    use super::{AppConfig, Mode, ProxyAction};
 
     #[test]
     fn loads_opa_policy_backend_config() {
@@ -528,5 +709,107 @@ audit:
         assert!(tokenization.enabled);
         assert_eq!(tokenization.key_env, "CUSTOM_TOKEN_KEY");
         assert_eq!(tokenization.token_prefix, "TKN1");
+    }
+
+    #[test]
+    fn defaults_to_reverse_mode_without_proxy() {
+        let config: AppConfig = serde_yaml::from_str(
+            r#"
+server:
+  bind: 127.0.0.1:8080
+upstream:
+  base_url: https://api.openai.com/
+auth:
+  principals: []
+detection:
+  rules: []
+session:
+  enabled: false
+response_filtering:
+  enabled: true
+audit:
+  jsonl_path: ./audit.log
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(config.mode, Mode::Reverse);
+        assert!(config.proxy.is_none());
+    }
+
+    #[test]
+    fn loads_proxy_mode_config() {
+        let config: AppConfig = serde_yaml::from_str(
+            r#"
+mode: proxy
+server:
+  bind: 127.0.0.1:8080
+upstream:
+  base_url: https://api.openai.com/
+auth:
+  principals: []
+detection:
+  rules: []
+session:
+  enabled: false
+response_filtering:
+  enabled: true
+audit:
+  jsonl_path: ./audit.log
+proxy:
+  listen_addr: 127.0.0.1:8888
+  intercept:
+    - kind: exact
+      value: api.openai.com
+    - kind: wildcard
+      value: "*.openai.azure.com"
+  passthrough:
+    - kind: exact
+      value: claude.ai
+  default_action: passthrough
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(config.mode, Mode::Proxy);
+        let proxy = config.proxy.expect("proxy config");
+        assert_eq!(proxy.listen_addr, "127.0.0.1:8888");
+        assert_eq!(proxy.default_action, ProxyAction::Passthrough);
+        assert_eq!(proxy.intercept.len(), 2);
+        assert_eq!(proxy.passthrough.len(), 1);
+        // defaults still populate untouched fields
+        assert_eq!(proxy.leaf_ttl_days, 7);
+        assert_eq!(proxy.pin_fallback.block_ttl_secs, 300);
+    }
+
+    #[test]
+    fn proxy_defaults_populate_baked_in_lists() {
+        let config: AppConfig = serde_yaml::from_str(
+            r#"
+mode: proxy
+server:
+  bind: 127.0.0.1:8080
+upstream:
+  base_url: https://api.openai.com/
+auth:
+  principals: []
+detection:
+  rules: []
+session:
+  enabled: false
+response_filtering:
+  enabled: true
+audit:
+  jsonl_path: ./audit.log
+proxy: {}
+"#,
+        )
+        .unwrap();
+
+        let proxy = config.proxy.expect("proxy config");
+        assert_eq!(proxy.listen_addr, "127.0.0.1:8888");
+        assert!(!proxy.intercept.is_empty(), "baked-in intercept list");
+        assert!(!proxy.passthrough.is_empty(), "baked-in passthrough list");
+        assert_eq!(proxy.default_action, ProxyAction::Passthrough);
     }
 }

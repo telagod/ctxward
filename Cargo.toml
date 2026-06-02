@@ -21,6 +21,8 @@ chrono = { version = "0.4", features = ["serde"] }
 futures-util = "0.3"
 hex = "0.4"
 http = "1"
+http-body-util = "0.1"
+hudsucker = { version = "0.24.1", features = ["http2"] }
 lopdf = "0.38"
 parking_lot = "0.12"
 pdf-extract = "0.10"
