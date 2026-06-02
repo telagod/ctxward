@@ -375,3 +375,18 @@ async fn serve_proxy(state: Arc<AppState>) -> Result<(), AppError> {
 - **真 HTTPS/CONNECT/SNI e2e**：当前 e2e 走 HTTP 路径（无需信任 stub 证书）证明 handler 接线；完整 HTTPS 终止 e2e 需自定义上游 connector 信任本地 stub，列为手工验收/后续。
 - **pin 自动标记**：hudsucker 0.24 `handle_error` 不暴露客户端拒证，PinCache 闸门保留但自动标记留 D2/未来；已知 pinned host（ChatGPT desktop 等）在默认 passthrough 名单兜底。
 - **body 无大小上限**：MITM 路径未限 body（reverse 有 `request_body_limit_bytes`）；桌面单用户威胁模型下非真漏洞，列为 defense-in-depth 待补。
+
+---
+
+## 10. D2 状态 — 部分落地 (2026-06-02)
+
+**D2 的可验证内核（per-OS 集成命令层）已落地并单测；Tauri 壳为骨架（需 GUI 工具链验证）。**
+
+已落地：
+- `src/platform.rs` — `TargetOs` + `CommandSpec` + per-OS 命令构造：CA 安装/卸载（macOS `security`、Windows `certutil`、Linux `update-ca-certificates`）+ 系统代理 set/clear（macOS `networksetup`、Windows `reg` WinINET、Linux `gsettings`）。OS 作显式入参，三端命令在 Linux CI 上全测；`elevated` 标志供 helper 统一提权；`run()` 拒绝静默跳过提权。7 单测绿。
+- `desktop/src-tauri/` — 独立 workspace 的 Tauri 2 crate：内嵌 `proxy_mode::run_proxy`，命令 start/stop/status、CA 导出、integration_plan（基于已验平台层）。**刻意不入 root workspace**，headless CI 不需 GUI 工具链。
+- `desktop/ui/index.html` — 控制台骨架（开关 + CA + 集成计划）。
+
+待续（next session，需 GUI 工具链）：托盘菜单（菜单驱动，非 click）；特权 helper 二进制（UAC/osascript/pkexec）；webview 实时审计流（Tauri `ipc::Channel`）；退出拆除 + 启动 self-heal；Linux per-NSS-db CA。详见 `desktop/README.md`。
+
+残留风险：Tauri crate 在此 headless 环境未编译验证（无 webkit/tauri-cli）；其 Rust 集成点引用真实 kernel API，但首次真编译可能需小幅修正。
