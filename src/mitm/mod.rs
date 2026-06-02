@@ -9,6 +9,7 @@ pub mod bridge;
 pub mod ca;
 pub mod classify;
 pub mod ruleset;
+pub mod usage;
 
 use std::sync::Arc;
 
@@ -156,6 +157,12 @@ impl HttpHandler for CtxwardHandler {
             }
         };
 
+        // Token/cost metering: count the request against its model (the `model`
+        // field is not PII, so reading it from the original bytes is fine).
+        if let Some(model) = usage::model_from_request(&raw) {
+            self.metrics.llm_request(&model);
+        }
+
         let blocked = processed.policy.decision == DecisionAction::Block;
         // Emit audit + metrics so the MITM path has the same observability as the
         // reverse-proxy path (lets the user verify redaction actually happened).
@@ -216,7 +223,7 @@ impl HttpHandler for CtxwardHandler {
         let (mut parts, body) = res.into_parts();
         let status = parts.status.as_u16();
 
-        let (_raw, processed) = match bridge::filter_body(
+        let (raw, processed) = match bridge::filter_body(
             &self.runtime,
             &self.metrics,
             &self.principal,
@@ -232,6 +239,15 @@ impl HttpHandler for CtxwardHandler {
                 return bad_gateway();
             }
         };
+
+        // Token/cost metering from a (non-streamed) response `usage` object.
+        if let Some(u) = usage::usage_from_response(&raw) {
+            self.metrics.llm_tokens(
+                u.model.as_deref().unwrap_or("unknown"),
+                u.prompt_tokens,
+                u.completion_tokens,
+            );
+        }
 
         crate::proxy::emit_decision_telemetry(
             &self.runtime,

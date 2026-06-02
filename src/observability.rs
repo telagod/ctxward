@@ -18,6 +18,8 @@ pub struct Metrics {
     auth_failures_total: IntCounterVec,
     review_events_total: IntCounterVec,
     processing_fallback_total: IntCounterVec,
+    llm_requests_total: IntCounterVec,
+    llm_tokens_total: IntCounterVec,
     payload_processing_duration_seconds: HistogramVec,
     upstream_duration_seconds: HistogramVec,
     active_sessions: IntGauge,
@@ -74,6 +76,20 @@ impl Metrics {
             ),
             &["kind"],
         )?;
+        let llm_requests_total = IntCounterVec::new(
+            Opts::new(
+                "gateway_llm_requests_total",
+                "Intercepted LLM requests by model",
+            ),
+            &["model"],
+        )?;
+        let llm_tokens_total = IntCounterVec::new(
+            Opts::new(
+                "gateway_llm_tokens_total",
+                "LLM token usage by model and kind (prompt/completion)",
+            ),
+            &["model", "kind"],
+        )?;
         let payload_processing_duration_seconds = HistogramVec::new(
             HistogramOpts::new(
                 "gateway_payload_processing_duration_seconds",
@@ -129,6 +145,8 @@ impl Metrics {
         registry.register(Box::new(auth_failures_total.clone()))?;
         registry.register(Box::new(review_events_total.clone()))?;
         registry.register(Box::new(processing_fallback_total.clone()))?;
+        registry.register(Box::new(llm_requests_total.clone()))?;
+        registry.register(Box::new(llm_tokens_total.clone()))?;
         registry.register(Box::new(payload_processing_duration_seconds.clone()))?;
         registry.register(Box::new(upstream_duration_seconds.clone()))?;
         registry.register(Box::new(active_sessions.clone()))?;
@@ -147,6 +165,8 @@ impl Metrics {
             auth_failures_total,
             review_events_total,
             processing_fallback_total,
+            llm_requests_total,
+            llm_tokens_total,
             payload_processing_duration_seconds,
             upstream_duration_seconds,
             active_sessions,
@@ -195,6 +215,25 @@ impl Metrics {
         self.processing_fallback_total
             .with_label_values(&[kind])
             .inc();
+    }
+
+    /// Count one intercepted LLM request for `model`.
+    pub fn llm_request(&self, model: &str) {
+        self.llm_requests_total.with_label_values(&[model]).inc();
+    }
+
+    /// Add prompt/completion token usage for `model` (from a response `usage`).
+    pub fn llm_tokens(&self, model: &str, prompt_tokens: u64, completion_tokens: u64) {
+        if prompt_tokens > 0 {
+            self.llm_tokens_total
+                .with_label_values(&[model, "prompt"])
+                .inc_by(prompt_tokens);
+        }
+        if completion_tokens > 0 {
+            self.llm_tokens_total
+                .with_label_values(&[model, "completion"])
+                .inc_by(completion_tokens);
+        }
     }
 
     pub fn payload_processing_timer(
@@ -288,6 +327,17 @@ impl Metrics {
                 "processing_fallback_total": counter_map_1(
                     &families,
                     "gateway_processing_fallback_total",
+                    "kind",
+                ),
+                "llm_requests_total": counter_map_1(
+                    &families,
+                    "gateway_llm_requests_total",
+                    "model",
+                ),
+                "llm_tokens_total": counter_map_2(
+                    &families,
+                    "gateway_llm_tokens_total",
+                    "model",
                     "kind",
                 ),
             },
