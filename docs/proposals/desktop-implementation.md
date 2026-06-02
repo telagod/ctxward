@@ -390,3 +390,27 @@ async fn serve_proxy(state: Arc<AppState>) -> Result<(), AppError> {
 待续（next session，需 GUI 工具链）：托盘菜单（菜单驱动，非 click）；特权 helper 二进制（UAC/osascript/pkexec）；webview 实时审计流（Tauri `ipc::Channel`）；退出拆除 + 启动 self-heal；Linux per-NSS-db CA。详见 `desktop/README.md`。
 
 残留风险：Tauri crate 在此 headless 环境未编译验证（无 webkit/tauri-cli）；其 Rust 集成点引用真实 kernel API，但首次真编译可能需小幅修正。
+
+---
+
+## 11. D4 状态 — 规则订阅 + signs_body 落地 (2026-06-02)
+
+**D4 头牌「provider 规则订阅(Clash 式热更新)」+ signs_body(安全重启 Bedrock 拦截)已落地并实证。** token/成本看板(留存钩子)留后续(需 Metrics 扩展 + 桌面 UI)。
+
+已落地：
+- `src/mitm/ruleset.rs` — 签名规则集：`Ruleset{version,intercept,passthrough,default_action,signs_body}` + `SignedRuleset{ruleset,signature}` + `parse_and_verify`(**ed25519 强验签**)。5 单测(有效签 / 篡改 / 错钥 / 坏 envelope / 坏 pubkey)。
+- `src/mitm/classify.rs` — Classifier 增 `signs_body` 匹配 + `from_ruleset`;可热换。
+- `src/mitm/mod.rs` — `SharedClassifier = Arc<RwLock<Arc<Classifier>>>`(读路径廉价 Arc clone);handler 对 signs_body host 做 **passthrough-on-modify**(检测/审计照常,body 将改则发原文保签名);`request_host` 共享提取。
+- `src/proxy_mode.rs` — `spawn_ruleset_updater`:轮询 → 验签 → 版本更新才热换;**任何失败 fail-closed 保留当前**;**仅当 url+pubkey 齐备才启用**(拒绝未签名 feed,防劫持 feed 把受害 host 塞进 intercept)。
+- `src/config.rs` — ProxyConfig 增 `signs_body`(默认 bedrock)+ `ruleset_pubkey`;**bedrock 安全放回 intercept**(signs_body 保护其请求体)。
+- `tests/mitm_e2e.rs` — 新增 `mitm_signs_body_preserves_original_request_body`:真代理验证 signs_body host 上游收到**未脱敏原文**、检测仍审计。
+
+安全要点:规则集签验**强制**(`verify_strict`),fail-closed 默认保留 baked-in/last-good;劫持 feed 无法新增拦截目标。这直接落实了 §6 与 §7 标的「被劫的 feed 不得能把受害 host 加进 intercept set」。
+
+对抗审查加固(3-agent fan-out → 三棱镜验证,5 坐实全数处理):
+- **不可撤地板(治 #1 回滚 / #2 快照偏移 / #3 空规则集 / #5 移除 baked-in,均 critical/high):** `Classifier::from_ruleset` 把 baked-in `default_intercept_hosts()` 作为**永远拦截、压过 passthrough 的地板**,signs_body 与 baked-in `default_signs_body_hosts()` 取并集。故规则集**只能增不能减**:回滚的旧规则集、空规则集、或把 OpenAI 列进 passthrough 的(签名)规则集,都无法让核心 provider 停止扫描;Bedrock 永在 signs_body 地板(签名安全恒定)。`from_config`(用户静态配置)无地板——operator 自己的配置是权威。
+- **下载 size cap(治 #4 OOM):** `MAX_RULESET_BYTES=1MiB`;`fetch_ruleset` 预检 Content-Length + 流式累积硬上限(防谎报长度的 feed OOM 代理),`parse_and_verify` 再加 `TooLarge` 防线。
+- 审查驳回的(假阳性):whitespace trim、ed25519ph context、response 侧 signs_body(响应不签名)、并发 deadlock(parking_lot guard 不跨 await)、updater panic(无 panic 点)等——经核验均不成立或越界。
+- 残留(已记、非 critical):跨重启 `current_version` 归零 → 旧规则集可重放,但**地板保证核心 provider 不被降级**,故仅影响 operator 自定义的额外 host;版本持久化列为可选 defense-in-depth。snapshot-in-self 修法因 h2 多路复用串号风险**不采纳**,改由地板消除 critical 偏移面。
+
+待续（D4 push 2）:token/成本计量(从拦截 JSON 解析 model+usage → AuditRecord/metrics)、retention 轮转、桌面成本看板(需 Tauri)。cosign keyless 作为可选第二签验通道(当前 ed25519 自包含、可在 Rust 内验,比 cosign 在无工具环境更可验)。

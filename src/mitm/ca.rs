@@ -184,9 +184,11 @@ mod tests {
             intercept: vec![],
             passthrough: vec![],
             default_action: crate::config::ProxyAction::Passthrough,
+            signs_body: vec![],
             per_app_rules: vec![],
             pin_fallback: crate::config::PinFallbackConfig::default(),
             ruleset_url: None,
+            ruleset_pubkey: None,
             ruleset_poll_secs: 300,
         }
     }

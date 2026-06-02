@@ -19,8 +19,10 @@ use crate::{
 
 /// Collect a body to bytes and run it through the detection/redaction pipeline.
 ///
-/// Returns the [`ProcessedPayload`] (sanitized body + policy outcome). The caller
-/// decides what to do with the policy decision (forward, block, etc.).
+/// Returns `(raw, processed)` — the original collected bytes alongside the
+/// [`ProcessedPayload`] (sanitized body + policy outcome). The raw bytes let the
+/// caller preserve an upstream-signed body (signs_body hosts) when redaction
+/// would otherwise modify it.
 pub(crate) async fn filter_body(
     runtime: &RuntimeState,
     metrics: &Metrics,
@@ -28,7 +30,7 @@ pub(crate) async fn filter_body(
     headers: &HeaderMap,
     body: Body,
     direction: Direction,
-) -> Result<ProcessedPayload, AppError> {
+) -> Result<(Bytes, ProcessedPayload), AppError> {
     let content_type = headers
         .get(http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -38,7 +40,7 @@ pub(crate) async fn filter_body(
         .await
         .map_err(|e| AppError::RuntimeIo(std::io::Error::other(e)))?
         .to_bytes();
-    process_payload(
+    let processed = process_payload(
         runtime,
         metrics,
         principal,
@@ -46,5 +48,6 @@ pub(crate) async fn filter_body(
         content_type.as_deref(),
         direction,
     )
-    .await
+    .await?;
+    Ok((raw, processed))
 }

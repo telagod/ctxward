@@ -62,20 +62,24 @@ async fn wait_until_listening(addr: SocketAddr) {
     panic!("proxy never started listening on {addr}");
 }
 
-/// Build a proxy-mode [`AppState`]. The returned [`tempfile::TempDir`] guard must
-/// be held by the caller for the lifetime of the proxy (it owns the CA + config).
-fn build_proxy_state(proxy_port: u16) -> (Arc<context_gurd::app::AppState>, tempfile::TempDir) {
+/// Build a proxy-mode [`AppState`]. `proxy_extra` is appended under `proxy:` in
+/// the config YAML (e.g. intercept/signs_body lists). The returned
+/// [`tempfile::TempDir`] guard must outlive the proxy (it owns the CA + config).
+fn build_proxy_state(
+    proxy_port: u16,
+    proxy_extra: &str,
+) -> (Arc<context_gurd::app::AppState>, tempfile::TempDir) {
     let temp = tempfile::tempdir().unwrap();
     let temp_path = temp.path().to_path_buf();
 
     let mut config: AppConfig =
         serde_yaml::from_str(include_str!("../config/example.yaml")).unwrap();
     config.mode = Mode::Proxy;
-    let proxy_cfg: ProxyConfig = serde_yaml::from_str(&format!(
-        "listen_addr: \"127.0.0.1:{proxy_port}\"\nca_dir: \"{}\"",
+    let proxy_yaml = format!(
+        "listen_addr: \"127.0.0.1:{proxy_port}\"\nca_dir: \"{}\"\n{proxy_extra}",
         temp_path.join("certs").display()
-    ))
-    .unwrap();
+    );
+    let proxy_cfg: ProxyConfig = serde_yaml::from_str(&proxy_yaml).unwrap();
     config.proxy = Some(proxy_cfg);
     config.audit.jsonl_path = temp_path.join("audit.jsonl").display().to_string();
     config.review.jsonl_path = temp_path.join("review.jsonl").display().to_string();
@@ -91,7 +95,7 @@ async fn mitm_redacts_request_and_response_and_blocks_phone() {
     let proxy_port = free_port();
     let proxy_addr: SocketAddr = format!("127.0.0.1:{proxy_port}").parse().unwrap();
 
-    let (state, _temp_guard) = build_proxy_state(proxy_port);
+    let (state, _temp_guard) = build_proxy_state(proxy_port, "");
     let audit = state.audit_store.clone();
     let (tx, rx) = tokio::sync::oneshot::channel::<()>();
     let proxy_task = tokio::spawn(async move {
@@ -159,6 +163,65 @@ async fn mitm_redacts_request_and_response_and_blocks_phone() {
             .iter()
             .any(|r| r.direction == "request" && r.decision == "block"),
         "MITM path must emit an audit record for the blocked phone request"
+    );
+
+    let _ = tx.send(());
+    let _ = proxy_task.await;
+}
+
+/// signs_body hosts (e.g. AWS SigV4) are intercepted for detection/audit, but
+/// the request body must reach the upstream *unmodified* so the signature stays
+/// valid. Here the stub host is in both intercept and signs_body: the email is
+/// detected (audited) but the upstream sees the original, un-redacted body.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn mitm_signs_body_preserves_original_request_body() {
+    let (stub_addr, captured) = start_echo_stub().await;
+    let stub_host = stub_addr.ip().to_string(); // "127.0.0.1"
+    let proxy_port = free_port();
+    let proxy_addr: SocketAddr = format!("127.0.0.1:{proxy_port}").parse().unwrap();
+
+    let proxy_extra = format!(
+        "intercept:\n  - kind: exact\n    value: \"{stub_host}\"\nsigns_body:\n  - kind: exact\n    value: \"{stub_host}\"\ndefault_action: passthrough\n"
+    );
+    let (state, _temp_guard) = build_proxy_state(proxy_port, &proxy_extra);
+    let audit = state.audit_store.clone();
+    let (tx, rx) = tokio::sync::oneshot::channel::<()>();
+    let proxy_task = tokio::spawn(async move {
+        context_gurd::proxy_mode::run_proxy(state, async move {
+            let _ = rx.await;
+        })
+        .await
+    });
+    wait_until_listening(proxy_addr).await;
+
+    let client = reqwest::Client::builder()
+        .proxy(reqwest::Proxy::http(format!("http://{proxy_addr}")).unwrap())
+        .build()
+        .unwrap();
+
+    let resp = client
+        .post(format!("http://{stub_addr}/v1/chat"))
+        .header("content-type", "application/json")
+        .body(r#"{"messages":[{"role":"user","content":"email me at signed@corp.example"}]}"#)
+        .send()
+        .await
+        .expect("request through proxy");
+    assert_eq!(resp.status(), 200);
+    let _ = resp.text().await;
+
+    // signature-preserving: upstream receives the ORIGINAL email, un-redacted.
+    let upstream_saw = String::from_utf8(captured.lock().unwrap().clone()).unwrap();
+    assert!(
+        upstream_saw.contains("signed@corp.example"),
+        "signs_body host must receive the original body unmodified, got: {upstream_saw}"
+    );
+    // ...but detection still happened and was audited.
+    let records = audit.snapshot();
+    assert!(
+        records
+            .iter()
+            .any(|r| r.direction == "request" && r.matched_labels.iter().any(|l| l == "email")),
+        "signs_body host must still detect + audit the email (just not modify the body)"
     );
 
     let _ = tx.send(());

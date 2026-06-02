@@ -8,6 +8,7 @@
 pub mod bridge;
 pub mod ca;
 pub mod classify;
+pub mod ruleset;
 
 use std::sync::Arc;
 
@@ -15,6 +16,7 @@ use http::{Request, Response, StatusCode};
 use hudsucker::{
     Body, HttpContext, HttpHandler, RequestOrResponse, decode_request, decode_response,
 };
+use parking_lot::RwLock;
 
 use crate::{
     app::RuntimeState,
@@ -24,6 +26,11 @@ use crate::{
 };
 
 pub use classify::{Classifier, PinCache};
+
+/// Hot-swappable classifier shared between the request handler and the rule-set
+/// updater. A new (verified) rule-set replaces the inner `Arc<Classifier>` under
+/// the write lock; the read path is a cheap `Arc` clone.
+pub type SharedClassifier = Arc<RwLock<Arc<Classifier>>>;
 
 /// A fixed local principal for the desktop proxy.
 ///
@@ -47,7 +54,7 @@ pub struct CtxwardHandler {
     runtime: Arc<RuntimeState>,
     metrics: Arc<Metrics>,
     principal: Principal,
-    classifier: Arc<Classifier>,
+    classifier: SharedClassifier,
     pins: Arc<PinCache>,
 }
 
@@ -56,7 +63,7 @@ impl CtxwardHandler {
         runtime: Arc<RuntimeState>,
         metrics: Arc<Metrics>,
         principal: Principal,
-        classifier: Arc<Classifier>,
+        classifier: SharedClassifier,
         pins: Arc<PinCache>,
     ) -> Self {
         Self {
@@ -67,22 +74,32 @@ impl CtxwardHandler {
             pins,
         }
     }
+
+    /// Snapshot the current classifier (cheap `Arc` clone under a read lock).
+    fn classifier(&self) -> Arc<Classifier> {
+        self.classifier.read().clone()
+    }
+}
+
+/// Extract the target host from a request: the URI authority (CONNECT) or the
+/// `Host` header, lowercased, port stripped.
+fn request_host(req_uri: &http::Uri, headers: &http::HeaderMap) -> String {
+    req_uri
+        .host()
+        .map(|h| h.to_string())
+        .or_else(|| {
+            headers
+                .get(http::header::HOST)
+                .and_then(|v| v.to_str().ok())
+                .map(|h| h.split(':').next().unwrap_or(h).to_string())
+        })
+        .unwrap_or_default()
 }
 
 impl HttpHandler for CtxwardHandler {
     async fn should_intercept(&mut self, ctx: &HttpContext, req: &Request<Body>) -> bool {
         // For a CONNECT request the URI authority is the target `host:port`.
-        let host = req
-            .uri()
-            .host()
-            .map(|h| h.to_string())
-            .or_else(|| {
-                req.headers()
-                    .get(http::header::HOST)
-                    .and_then(|v| v.to_str().ok())
-                    .map(|h| h.split(':').next().unwrap_or(h).to_string())
-            })
-            .unwrap_or_default();
+        let host = request_host(req.uri(), req.headers());
         let peer = ctx.client_addr.ip().to_string();
 
         // A host whose client previously rejected our leaf cert is spliced (no MITM).
@@ -92,7 +109,7 @@ impl HttpHandler for CtxwardHandler {
         }
 
         let intercept = matches!(
-            self.classifier.classify(&host),
+            self.classifier().classify(&host),
             crate::config::ProxyAction::Intercept
         );
         tracing::debug!(%host, intercept, "classify CONNECT");
@@ -115,13 +132,14 @@ impl HttpHandler for CtxwardHandler {
         };
         let (mut parts, body) = req.into_parts();
         let request_id = uuid::Uuid::new_v4().to_string();
+        let host = request_host(&parts.uri, &parts.headers);
         let path = parts
             .uri
             .path_and_query()
             .map(|pq| pq.as_str().to_string())
             .unwrap_or_else(|| parts.uri.path().to_string());
 
-        let processed = match bridge::filter_body(
+        let (raw, processed) = match bridge::filter_body(
             &self.runtime,
             &self.metrics,
             &self.principal,
@@ -131,7 +149,7 @@ impl HttpHandler for CtxwardHandler {
         )
         .await
         {
-            Ok(p) => p,
+            Ok(v) => v,
             Err(err) => {
                 tracing::warn!(%err, "request pipeline error; failing closed");
                 return RequestOrResponse::Response(bad_gateway());
@@ -157,13 +175,20 @@ impl HttpHandler for CtxwardHandler {
             return RequestOrResponse::Response(blocked_response());
         }
 
+        // signs_body hosts (e.g. AWS SigV4): the upstream signed the *original*
+        // body, so a redacted body would 4xx. Detection/audit already happened
+        // above; forward the original bytes to keep the signature valid.
+        let outbound = if self.classifier().signs_body(&host) && processed.sanitized_body != raw {
+            tracing::warn!(%host, "signs_body host: forwarding original body (redaction skipped to preserve signature)");
+            raw
+        } else {
+            processed.sanitized_body
+        };
+
         // Body length changed by redaction; drop framing headers so hyper
         // recomputes them for the rebuilt (un-chunked, known-length) body.
         strip_framing_headers(&mut parts.headers);
-        RequestOrResponse::Request(Request::from_parts(
-            parts,
-            Body::from(processed.sanitized_body),
-        ))
+        RequestOrResponse::Request(Request::from_parts(parts, Body::from(outbound)))
     }
 
     async fn handle_response(&mut self, _ctx: &HttpContext, res: Response<Body>) -> Response<Body> {
@@ -191,7 +216,7 @@ impl HttpHandler for CtxwardHandler {
         let (mut parts, body) = res.into_parts();
         let status = parts.status.as_u16();
 
-        let processed = match bridge::filter_body(
+        let (_raw, processed) = match bridge::filter_body(
             &self.runtime,
             &self.metrics,
             &self.principal,
@@ -201,7 +226,7 @@ impl HttpHandler for CtxwardHandler {
         )
         .await
         {
-            Ok(p) => p,
+            Ok(v) => v,
             Err(err) => {
                 tracing::warn!(%err, "response pipeline error; failing closed");
                 return bad_gateway();
