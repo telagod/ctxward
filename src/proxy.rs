@@ -1479,7 +1479,7 @@ async fn transform_sse_line(
     }
 }
 
-async fn process_payload(
+pub(crate) async fn process_payload(
     runtime: &RuntimeState,
     metrics: &Metrics,
     principal: &Principal,
@@ -1663,9 +1663,9 @@ async fn process_text(
     })
 }
 
-struct ProcessedPayload {
-    sanitized_body: Bytes,
-    policy: PolicyOutcome,
+pub(crate) struct ProcessedPayload {
+    pub(crate) sanitized_body: Bytes,
+    pub(crate) policy: PolicyOutcome,
 }
 
 impl ProcessedPayload {
@@ -1815,7 +1815,17 @@ async fn apply_opa_policy(
 
 fn authenticate_request(state: &AppState, headers: &HeaderMap) -> Result<Principal, AppError> {
     let runtime = state.current();
-    runtime.auth.authenticate(headers).map_err(AppError::Auth)
+    authenticate_with(&runtime.auth, headers)
+}
+
+/// Authenticate against an [`Authenticator`] directly, without an [`AppState`].
+///
+/// Used by the MITM proxy path, which holds a `RuntimeState` but no `AppState`.
+pub(crate) fn authenticate_with(
+    auth: &crate::auth::Authenticator,
+    headers: &HeaderMap,
+) -> Result<Principal, AppError> {
+    auth.authenticate(headers).map_err(AppError::Auth)
 }
 
 fn emit_metrics_for_findings(
@@ -1871,6 +1881,10 @@ fn proxy_error_kind(err: &AppError) -> &'static str {
         AppError::AuditInit(_) => "audit",
         AppError::Bind(_) => "bind",
         AppError::Serve(_) => "serve",
+        AppError::ProxyConfigMissing => "proxy_config_missing",
+        AppError::ProxyListenAddr(_) => "proxy_listen_addr",
+        AppError::Ca(_) => "proxy_ca",
+        AppError::Proxy(_) => "proxy_serve",
     }
 }
 
@@ -1990,6 +2004,43 @@ fn build_audit_record(
     }
 }
 
+/// Emit detection metrics, an audit record, and the policy-decision metric for
+/// one processed payload. Shared by the reverse-proxy and the MITM proxy paths
+/// so both data planes produce identical observability + audit output.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn emit_decision_telemetry(
+    runtime: &RuntimeState,
+    metrics: &Metrics,
+    principal: &Principal,
+    direction: Direction,
+    request_id: &str,
+    path_and_query: &str,
+    policy: &PolicyOutcome,
+    status_code: Option<u16>,
+) {
+    emit_metrics_for_findings(metrics, direction, &policy.findings);
+    let audit_context = AuditContext {
+        request_id: request_id.to_string(),
+        path_and_query: path_and_query.to_string(),
+        session_id: None,
+        session_escalated: false,
+    };
+    runtime.audit.emit(build_audit_record(
+        principal,
+        direction,
+        policy.decision,
+        policy,
+        &audit_context,
+        status_code,
+    ));
+    emit_processing_fallback_metric(metrics, &policy.source);
+    let direction_str = match direction {
+        Direction::Request => "request",
+        Direction::Response => "response",
+    };
+    metrics.policy_decision(direction_str, action_name(policy.decision), &policy.source);
+}
+
 fn build_upstream_response(
     status_code: u16,
     headers: &reqwest::header::HeaderMap,
@@ -2056,7 +2107,7 @@ fn is_json(content_type: Option<&str>) -> bool {
 
 fn is_sse(content_type: Option<&str>) -> bool {
     content_type
-        .map(|value| value.contains("text/event-stream"))
+        .map(|value| value.to_ascii_lowercase().starts_with("text/event-stream"))
         .unwrap_or(false)
 }
 

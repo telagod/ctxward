@@ -2,8 +2,16 @@ name: ci
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+
+# Run once per ref: a PR-branch push fires `pull_request` only (push is scoped
+# to main), so the bench gate no longer runs twice (push + PR) per commit.
+# Newer commits on the same ref cancel superseded in-progress runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
@@ -42,6 +50,12 @@ jobs:
     concurrency:
       group: context-gurd-bench-${{ github.ref }}
       cancel-in-progress: false
+    # Relax the absolute perf gate for shared CI hardware (throughput floor
+    # halved, latency ceilings doubled). Local/dedicated runs keep the strict
+    # defaults (1.0); a real multiple-x regression still trips even when relaxed.
+    env:
+      BENCH_RPS_FLOOR_SCALE: "0.5"
+      BENCH_LATENCY_CEIL_SCALE: "2.0"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

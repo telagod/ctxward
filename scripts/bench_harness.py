@@ -43,6 +43,14 @@ DEMO_AUTH = "Bearer demo-secret"
 ADMIN_AUTH = "Bearer admin-secret"
 EMAIL_PATTERN = r"\[EMAIL_TOKEN:CGT1\.[^\]]+\]"
 
+# GitHub-hosted runners share hardware; absolute throughput/latency gates flake
+# on noisy neighbours. These env-driven multipliers let CI relax the perf gate
+# without weakening it for local or dedicated-runner runs. Defaults = 1.0 =
+# strict (no behaviour change). CI sets a throughput floor < 1.0 and a latency
+# ceiling > 1.0. A real (multiple-x) regression still trips even when relaxed.
+PERF_FLOOR_SCALE = float(os.environ.get("BENCH_RPS_FLOOR_SCALE", "1.0"))
+PERF_CEIL_SCALE = float(os.environ.get("BENCH_LATENCY_CEIL_SCALE", "1.0"))
+
 
 @dataclass(frozen=True)
 class Thresholds:
@@ -1058,12 +1066,18 @@ def validate_artifacts(runtime: ScenarioRuntime, artifacts: BenchArtifacts) -> d
     expect(int(payload_request["count"]) == request_payload_expected, "request payload count mismatch")
     expect(int(payload_response["count"]) == runtime.requests, "response payload count mismatch")
     expect(int(upstream_latency["count"]) == runtime.requests, "upstream latency count mismatch")
-    expect(bench["latency_ms"]["avg"] < thresholds.avg_ms_max, f"avg latency too high: {bench['latency_ms']['avg']}")
-    expect(bench["latency_ms"]["p95"] < thresholds.p95_ms_max, f"p95 latency too high: {bench['latency_ms']['p95']}")
-    expect(bench["throughput_rps"] > thresholds.throughput_rps_min, f"throughput too low: {bench['throughput_rps']}")
-    expect(histogram_avg_ms(payload_request) < thresholds.payload_request_avg_ms_max, "request payload latency too high")
-    expect(histogram_avg_ms(payload_response) < thresholds.payload_response_avg_ms_max, "response payload latency too high")
-    expect(histogram_avg_ms(upstream_latency) < thresholds.upstream_avg_ms_max, "upstream latency too high")
+    rps_floor = thresholds.throughput_rps_min * PERF_FLOOR_SCALE
+    avg_ceil = thresholds.avg_ms_max * PERF_CEIL_SCALE
+    p95_ceil = thresholds.p95_ms_max * PERF_CEIL_SCALE
+    payload_req_ceil = thresholds.payload_request_avg_ms_max * PERF_CEIL_SCALE
+    payload_resp_ceil = thresholds.payload_response_avg_ms_max * PERF_CEIL_SCALE
+    upstream_ceil = thresholds.upstream_avg_ms_max * PERF_CEIL_SCALE
+    expect(bench["latency_ms"]["avg"] < avg_ceil, f"avg latency too high: {bench['latency_ms']['avg']} (ceil {avg_ceil})")
+    expect(bench["latency_ms"]["p95"] < p95_ceil, f"p95 latency too high: {bench['latency_ms']['p95']} (ceil {p95_ceil})")
+    expect(bench["throughput_rps"] > rps_floor, f"throughput too low: {bench['throughput_rps']} (floor {rps_floor})")
+    expect(histogram_avg_ms(payload_request) < payload_req_ceil, "request payload latency too high")
+    expect(histogram_avg_ms(payload_response) < payload_resp_ceil, "response payload latency too high")
+    expect(histogram_avg_ms(upstream_latency) < upstream_ceil, "upstream latency too high")
     expect("gateway_payload_processing_duration_seconds" in metrics, "payload metric missing")
     expect("gateway_upstream_duration_seconds" in metrics, "upstream metric missing")
     expect(summary["response_filtering"]["enabled"] is True, "response filtering disabled")
