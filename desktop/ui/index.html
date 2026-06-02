@@ -6,45 +6,56 @@
     <title>Ctxward</title>
     <style>
       :root { color-scheme: dark; }
-      body {
-        font: 14px/1.5 -apple-system, system-ui, sans-serif;
-        margin: 0; padding: 24px; background: #0f1115; color: #e6e6e6;
-      }
-      h1 { font-size: 18px; margin: 0 0 4px; }
-      .sub { color: #8a8f98; margin: 0 0 20px; }
-      .row { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
-      button {
-        background: #2b6cb0; color: #fff; border: 0; border-radius: 6px;
-        padding: 8px 16px; font-size: 14px; cursor: pointer;
-      }
+      body { font: 14px/1.5 -apple-system, system-ui, sans-serif; margin: 0; padding: 22px; background: #0f1115; color: #e6e6e6; }
+      h1 { font-size: 18px; margin: 0 0 2px; }
+      .sub { color: #8a8f98; margin: 0 0 18px; }
+      .card { background: #161a20; border: 1px solid #2d333b; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+      .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      .label { color: #8a8f98; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+      button { background: #2b6cb0; color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; }
       button.secondary { background: #2d333b; }
-      button:disabled { opacity: .5; cursor: default; }
+      button.danger { background: #9b2c2c; }
       #status { font-weight: 600; }
-      #status.on { color: #48bb78; }
-      #status.off { color: #e05252; }
-      pre {
-        background: #161a20; border: 1px solid #2d333b; border-radius: 6px;
-        padding: 12px; overflow: auto; max-height: 240px; font-size: 12px;
-      }
-      .label { color: #8a8f98; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+      #status.on { color: #48bb78; } #status.off { color: #e05252; }
+      pre { background: #0c0e12; border: 1px solid #2d333b; border-radius: 6px; padding: 10px; overflow: auto; max-height: 150px; font-size: 11px; margin: 0; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid #20262e; }
+      th { color: #8a8f98; font-weight: 600; }
+      .decision-redact { color: #ecc94b; } .decision-block { color: #e05252; } .decision-allow { color: #48bb78; }
+      .hint { color: #6b7280; font-size: 11px; }
     </style>
   </head>
   <body>
     <h1>Ctxward</h1>
     <p class="sub">Transparent LLM-privacy gateway — every prompt cleaned before it leaves your machine.</p>
 
-    <div class="row">
-      <span class="label">Proxy</span>
-      <span id="status" class="off">stopped</span>
-      <button id="toggle">Start</button>
-      <button id="plan" class="secondary">Show integration plan</button>
+    <div class="card">
+      <div class="label">Proxy</div>
+      <div class="row">
+        <span id="status" class="off">stopped</span>
+        <button id="toggle">Start</button>
+        <button id="setProxy" class="secondary">Set system proxy</button>
+        <button id="clearProxy" class="secondary">Clear system proxy</button>
+      </div>
+      <p class="hint">Set/clear and CA install prompt once for admin rights.</p>
     </div>
 
-    <div class="label">Root CA</div>
-    <pre id="ca">—</pre>
+    <div class="card">
+      <div class="label">Root CA</div>
+      <div class="row" style="margin-bottom:8px">
+        <button id="installCa" class="secondary">Install CA</button>
+        <button id="uninstallCa" class="danger">Uninstall CA</button>
+      </div>
+      <pre id="ca">—</pre>
+    </div>
 
-    <div class="label">Integration plan</div>
-    <pre id="planOut">—</pre>
+    <div class="card">
+      <div class="label">Live audit feed</div>
+      <table>
+        <thead><tr><th>time</th><th>dir</th><th>decision</th><th>labels</th></tr></thead>
+        <tbody id="audit"></tbody>
+      </table>
+    </div>
 
     <script type="module">
       const { invoke } = window.__TAURI__.core;
@@ -52,6 +63,7 @@
 
       const statusEl = document.getElementById("status");
       const toggleEl = document.getElementById("toggle");
+      const auditEl = document.getElementById("audit");
 
       function setStatus(running) {
         statusEl.textContent = running ? "running" : "stopped";
@@ -60,26 +72,32 @@
       }
 
       async function refresh() {
-        setStatus(await invoke("proxy_status"));
-        try { document.getElementById("ca").textContent = (await invoke("ca_cert_pem")) ?? "(not generated yet)"; }
+        try { setStatus(await invoke("proxy_status")); } catch {}
+        try { document.getElementById("ca").textContent = (await invoke("ca_cert_pem")) ?? "(generated on first proxy start)"; }
         catch (e) { document.getElementById("ca").textContent = String(e); }
       }
 
-      toggleEl.addEventListener("click", async () => {
-        const running = await invoke("proxy_status");
-        await invoke(running ? "stop_proxy" : "start_proxy");
-        await refresh();
-      });
+      async function call(cmd) { try { await invoke(cmd); } catch (e) { alert(cmd + ": " + e); } await refresh(); }
 
-      document.getElementById("plan").addEventListener("click", async () => {
-        try {
-          const plan = await invoke("integration_plan", { host: "127.0.0.1", port: 8888 });
-          document.getElementById("planOut").textContent = plan.join("\n");
-        } catch (e) { document.getElementById("planOut").textContent = String(e); }
+      toggleEl.addEventListener("click", async () => {
+        await call((await invoke("proxy_status")) ? "stop_proxy" : "start_proxy");
       });
+      document.getElementById("setProxy").addEventListener("click", () => call("set_system_proxy"));
+      document.getElementById("clearProxy").addEventListener("click", () => call("clear_system_proxy"));
+      document.getElementById("installCa").addEventListener("click", () => call("install_ca"));
+      document.getElementById("uninstallCa").addEventListener("click", () => call("uninstall_ca"));
 
       listen("proxy://status", (e) => setStatus(e.payload === "running"));
-      listen("proxy://error", (e) => { document.getElementById("planOut").textContent = "error: " + e.payload; });
+      listen("proxy://error", (e) => console.error("ctxward proxy:", e.payload));
+      listen("audit://record", (e) => {
+        const r = e.payload;
+        const tr = document.createElement("tr");
+        const labels = (r.matched_labels || []).join(", ");
+        tr.innerHTML = `<td>${(r.ts || "").toString().slice(11, 19)}</td><td>${r.direction}</td>` +
+          `<td class="decision-${r.decision}">${r.decision}</td><td>${labels}</td>`;
+        auditEl.prepend(tr);
+        while (auditEl.children.length > 100) auditEl.lastChild.remove();
+      });
 
       refresh();
     </script>

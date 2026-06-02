@@ -42,3 +42,7 @@ coverage/
 
 # wasm-pack output for the browser extension (generated)
 ext/pkg/
+
+# nested-workspace build artifacts (e.g. desktop/src-tauri/target)
+**/target/
+desktop/src-tauri/gen/schemas/

@@ -391,6 +391,12 @@ async fn serve_proxy(state: Arc<AppState>) -> Result<(), AppError> {
 
 残留风险：Tauri crate 在此 headless 环境未编译验证（无 webkit/tauri-cli）；其 Rust 集成点引用真实 kernel API，但首次真编译可能需小幅修正。
 
+**更新（2026-06-03）：D2 Tauri 壳已全功能落地并本地编译通过。** 本机即开发机（webkit2gtk-4.1 2.52 / gtk3 / jscoregtk / libsoup3 / ayatana-appindicator 齐备），生成合法 PNG 图标后 `cargo build --manifest-path desktop/src-tauri/Cargo.toml` 通过（tauri 2.11.2 / wry 0.55 / tao 0.35 全栈），`clippy -D warnings` + fmt 净。经 4-agent workflow 调研 Tauri 2.11 精确 API（tray/menu、提权、审计流、生命周期）合成实现契约，且对真源码纠偏（`CommandSpec` 非 serde → 提权 specs Rust 侧重建不跨 IPC；parking_lot 同步锁 + tokio 仅 `proxy_engaged`；teardown 在 `RunEvent::Exit` 经新 OS 线程 `block_on` 避免 reactor 内 panic）。
+- 全功能 `desktop/src-tauri/src/lib.rs`：tray（Start/Stop/Open/Quit，菜单驱动 + hide-to-tray）；proxy lifecycle（内嵌 `run_proxy` + graceful shutdown）；CA 装卸 + 系统代理 set/clear（提权 `CommandSpec` 批量经**单次** pkexec/osascript/UAC，`sh_quote` 防注入）；webview 实时审计流（`audit://record` Emitter 广播，轮询 ring buffer）；退出 teardown（停 proxy/pump + 清系统代理）。
+- 前端 `desktop/ui/index.html`：状态/Start/Stop、CA 装卸、系统代理 set/clear、实时审计表。
+- **运行时未验**（需桌面会话 GTK display + 一次提权弹窗）；编译/clippy/fmt 已验。
+- 待续（硬化）：签名 helper + polkit `.policy`（替 `pkexec sh -c`）；Windows `-EncodedCommand`；Linux per-NSS-db CA；成本看板视图。
+
 ---
 
 ## 11. D4 状态 — 规则订阅 + signs_body 落地 (2026-06-02)
