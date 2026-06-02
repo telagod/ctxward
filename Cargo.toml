@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "crates/ctxward-core"]
+
 [package]
 name = "context-gurd"
 version = "0.2.0"
@@ -12,6 +15,9 @@ categories = ["web-programming::http-server", "command-line-utilities"]
 rust-version = "1.85"
 
 [dependencies]
+# Explicit version (not just path) so cargo-deny's `wildcards = "deny"` does not
+# treat the workspace path dep as a `*` requirement.
+ctxward-core = { path = "crates/ctxward-core", version = "0.2.0" }
 aes-gcm-siv = "0.11"
 async-stream = "0.3"
 axum = { version = "0.8", features = ["json", "macros"] }

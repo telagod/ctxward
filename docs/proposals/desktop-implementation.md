@@ -419,4 +419,19 @@ token/成本计量(留存钩子后端)已落地:
 - handler:请求记 `llm_request(model)`,(非流式)响应记 `llm_tokens(model,prompt,completion)`;e2e 断言 gpt-test 请求计数 + prompt=11/completion=7。
 - 限制:流式(SSE)响应当前透传不缓冲,尾部 usage 不计量(随 D1.5 SSE 处理补)。
 
-待续:retention 轮转、桌面成本看板 UI(需 Tauri)、D1.5 SSE 流式脱敏+计量。cosign keyless 作为可选第二签验通道(当前 ed25519 自包含、可在 Rust 内验,比 cosign 在无工具环境更可验)。
+待续:retention 轮转、桌面成本看板 UI(需 Tauri)。cosign keyless 作为可选第二签验通道(当前 ed25519 自包含、可在 Rust 内验,比 cosign 在无工具环境更可验)。
+
+---
+
+## 12. Phase B — `ctxward-core` 抽离已落地 (2026-06-03)
+
+**纯逻辑内核已抽成独立 crate,D3 浏览器扩展的 WASM 前置就位。**
+
+- workspace:root `[workspace] members=[".", "crates/ctxward-core"]`;gateway(`context-gurd`)依赖 `ctxward-core`。
+- `crates/ctxward-core/`:`git mv` 了 8 个互相闭合、零 gateway 回指的纯模块——`config / types / detect / redact / policy / session / tokenize / auth`。依赖仅 serde/regex/sha2/aes-gcm-siv/base64/hex/uuid/parking_lot/http 等纯 crate,无 tokio/axum/reqwest/hudsucker。
+- 零摩擦迁移技巧:gateway `lib.rs` 用 `pub use ctxward_core::{auth,config,detect,policy,redact,session,tokenize,types}` re-export,故 gateway 内现有 `crate::types::X`/`crate::config::Y` 等引用**全部零改动**仍解析;core 内部模块互引 `crate::` 自然指向 core。
+- `auth.rs`:`axum::http::HeaderMap` → `http::HeaderMap`(同一类型,axum 本就 re-export http),为 WASM-compat 去掉 axum 依赖。
+- 工具链同步:Dockerfile 加 `COPY crates ./crates`;Makefile `test`/`clippy` 加 `--workspace`;release.yml 的 bin 名/路径不变,SBOM `--all` 自动覆盖双 crate。
+- 验证:`cargo test --workspace` 97 绿(gateway 82 + core 12 + e2e 3),`clippy --workspace -D warnings` + fmt 净。
+
+D3 起点:`crates/ctxward-core` 加 `crate-type=["cdylib","rlib"]` + `wasm-bindgen`,导出 `redact_json(&str)->String` 包 `detect`+`redact`,`wasm-pack build --target web`。

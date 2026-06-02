@@ -595,7 +595,7 @@ fn default_pin_block_ttl_secs() -> u64 {
 /// Also used as the **immutable floor** for hot-updated rule-sets: these hosts
 /// are always intercepted, so a rolled-back, minimal, or hijacked-but-signed
 /// rule-set can never stop scanning the core providers.
-pub(crate) fn default_intercept_hosts() -> Vec<HostPattern> {
+pub fn default_intercept_hosts() -> Vec<HostPattern> {
     vec![
         HostPattern::Exact("api.openai.com".into()),
         HostPattern::Wildcard("*.openai.azure.com".into()),
@@ -643,7 +643,7 @@ fn default_passthrough_hosts() -> Vec<HostPattern> {
 /// Also the immutable signs_body floor for hot-updated rule-sets: a rule-set
 /// can add signs_body hosts but can never drop a baked-in one (so e.g. Bedrock
 /// stays signature-safe regardless of the feed).
-pub(crate) fn default_signs_body_hosts() -> Vec<HostPattern> {
+pub fn default_signs_body_hosts() -> Vec<HostPattern> {
     vec![
         HostPattern::Regex(r"^bedrock-runtime\.[a-z0-9-]+\.amazonaws\.com$".into()),
         HostPattern::Regex(r"^bedrock-mantle\.[a-z0-9-]+\.api\.aws$".into()),
