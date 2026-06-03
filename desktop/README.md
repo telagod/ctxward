@@ -23,23 +23,33 @@ Clash-style desktop front-end for the transparent MITM proxy. Embeds
 | Tray + window config | `desktop/src-tauri/tauri.conf.json` | ✅ build-validated |
 | Control panel UI (status, CA, proxy, live audit feed) | `desktop/ui/index.html` | ⚠️ runtime (needs display) |
 
-## Build (on a machine with the GUI toolchain)
+## Build & package
 
 Prerequisites:
 - Rust 1.85+
-- Tauri 2 system deps — Linux: `libwebkit2gtk-4.1-dev`, `libappindicator3-dev`,
-  `librsvg2-dev`, `patchelf`; macOS: Xcode CLT; Windows: WebView2 + MSVC.
+- Tauri 2 system deps — Linux: `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`,
+  `libayatana-appindicator3-dev`, `librsvg2-dev`, `patchelf`; macOS: Xcode CLT;
+  Windows: WebView2 + MSVC.
 - `cargo install tauri-cli --version '^2'`
-- Tray icon at `desktop/src-tauri/icons/icon.png` (add before building).
+- Icon set is committed (generated from `icons/icon-source.png` via
+  `cargo tauri icon icons/icon-source.png`).
 
 ```bash
 cd desktop/src-tauri
-cargo tauri dev      # run with hot-reload
-cargo tauri build    # produce installers
+cargo tauri dev                 # run with hot-reload
+cargo tauri build --bundles deb # produce the Debian package
 ```
 
-By default the shell reads `CONTEXT_GURD_CONFIG` (a `mode: proxy` config) or
-falls back to `config/example.yaml`.
+**Delivery (verified locally):** `cargo tauri build --bundles deb` produces
+`target/release/bundle/deb/Ctxward_0.2.0_amd64.deb` (~11 MB), a proper Debian
+package with `Depends: libwebkit2gtk-4.1-0, libgtk-3-0,
+libayatana-appindicator3-1` (apt resolves these on install), a
+`usr/share/applications/Ctxward.desktop` launcher, and hicolor theme icons.
+Install with `sudo apt install ./Ctxward_0.2.0_amd64.deb`.
+
+Other targets: `--bundles appimage` (Linux, downloads linuxdeploy), `dmg`
+(macOS), `msi`/`nsis` (Windows). `config/example.yaml` is the default config
+(`CONTEXT_GURD_CONFIG` overrides); set `mode: proxy` to run as the gateway.
 
 ## Done
 
