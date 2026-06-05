@@ -99,6 +99,24 @@ jobs:
               '> If the new numbers are the legitimate norm, re-promote the baseline (see `bench/README.md`).',
             ].join('\n');
             const { owner, repo } = context.repo;
+            // Debounce: a single failing nightly on shared runners is usually
+            // small-sample VM variance (see the pdf-redact false positive in
+            // issue #11), not a code regression. Only alert when the PREVIOUS
+            // nightly also failed — a genuine regression persists and opens an
+            // issue one night later, while a one-night flake stays silent.
+            const prevRuns = await github.rest.actions.listWorkflowRuns({
+              owner, repo, workflow_id: 'bench-nightly.yml', status: 'completed', per_page: 5,
+            });
+            const prior = prevRuns.data.workflow_runs.filter((r) => r.id !== context.runId);
+            const prevFailed = prior.length > 0 && prior[0].conclusion === 'failure';
+            if (!prevFailed) {
+              core.warning(
+                'bench-nightly gate failed, but the previous nightly did not — ' +
+                'treating as single-night shared-runner variance, not opening an issue. ' +
+                detail.replace(/\n/g, ' ')
+              );
+              return;
+            }
             const existing = await github.rest.issues.listForRepo({
               owner, repo, state: 'open', labels: 'perf-regression', per_page: 1,
             });
