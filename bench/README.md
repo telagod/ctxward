@@ -24,20 +24,17 @@ fixed reference** and can flag regressions.
 - **Catches:** large, decisive regressions — throughput drop / avg-latency rise
   where the run's sample range no longer overlaps the baseline's. In practice
   that means roughly **1.4–2×+ on avg latency and throughput**.
-- **Does NOT reliably catch:** p95 regressions (a single shared-runner spike
-  widens the baseline band — e.g. a `run-01` p95 of ~48 ms vs ~15 ms median —
-  so even a 3× p95 move can be suppressed), nor sub-band drift. Absolute
-  latency ceilings are warnings here, not failures (shared-hardware noise).
-- **Current-snapshot caveat:** this baseline was captured with cold-start
-  `run-01` outliers on **3 of 6** scenarios (json-tokenize p95 run-01 ≈ 392 ms,
-  json-review-replay ≈ 112 ms, json-redact ≈ 48 ms vs ~15 ms medians). Those
-  inflate the baseline band so wide the gate is **near-blind on those three**
-  until re-promoted. The 3 stable scenarios (json-opa, json-presidio,
-  pdf-redact) already gate well. **Follow-up:** add a harness warm-up that
-  discards `run-01` before measuring, then re-promote — that restores teeth on
-  all six without faking data (you cannot hand-edit a sample out: dropping a run
-  breaks the median-of-3 aggregation-compat check, replacing one fabricates
-  data).
+- **Cold-start handled:** the harness now discards a warm-up run before
+  measuring (`bench-matrix --warmup`, default 1), so the page-cache cold-start
+  spike no longer lands in `sample_runs`. After re-promotion the p95 bands are
+  tight — json-redact p95 band 15.4–15.9 ms (≈ 1.03×), down from a 14.8–47.9 ms
+  (3.2×) cold-start spread — giving the gate real teeth.
+- **Does NOT reliably catch:** sub-band drift, and one per-scenario quirk:
+  json-tokenize *throughput* still swings widely (a run can drop to ~75 rps vs
+  ~640) from occasional shared-runner CPU contention, so its throughput band
+  stays wide and dull (its latency band is tight). Absolute latency ceilings are
+  warnings here, not failures (shared-hardware noise). To tame json-tokenize
+  throughput further, bump `RUNS` (5+) on a re-promote — optional.
 - **Precision gating** (tight absolute thresholds) needs a **dedicated /
   self-hosted runner**. That is the standing follow-up; on shared hardware the
   band-guarded relative gate is the best honest signal.
@@ -47,12 +44,15 @@ On a gate failure the nightly opens/updates a `perf-regression` issue. It is
 
 ## Provenance of the current baseline
 
-- Source: bench artifact `bench-matrix-26964600410` (CI run on PR #9, a clean
-  GitHub-hosted `ubuntu-latest`).
+- Source: bench artifact `bench-matrix-27030890788` (a **warm-up-enabled** CI
+  run on `main`, a clean GitHub-hosted `ubuntu-latest`).
+- Captured with `--warmup 1`: one discarded warm-up run primes the page cache so
+  every measured run is cache-warm. Bands are tight (p95 ≈ 1.0–1.2× across
+  scenarios), except json-tokenize throughput (CPU-contention swing, see above).
 - Aggregation: **median-of-3** (`runs: 3`), matching what `bench-matrix.sh`
   produces in CI — the gate refuses to compare mismatched aggregations.
-- It is a shared-runner snapshot, so absolute values carry runner variance.
-  That is acceptable: the gate compares *relative* deltas with a band guard.
+- Still a shared-runner snapshot, so absolute values carry runner variance; the
+  gate compares *relative* deltas with a band guard.
 
 ## Re-promoting the baseline
 
