@@ -940,20 +940,33 @@ def aggregate_scenario_runs(runtime: ScenarioRuntime, runs: list[ScenarioRunResu
     return ScenarioRunResult(report=aggregated, report_text=report_text)
 
 
-def run_scenario_repeated(runtime: ScenarioRuntime, *, runs: int, build: bool) -> ScenarioRunResult:
-    if runs <= 1:
+def run_scenario_repeated(
+    runtime: ScenarioRuntime, *, runs: int, build: bool, warmup: int = 0
+) -> ScenarioRunResult:
+    if runs <= 1 and warmup <= 0:
         return run_scenario(runtime, build=build)
 
     sanitize_root(runtime.root)
     runs_root = runtime.root / "runs"
     runs_root.mkdir(parents=True, exist_ok=True)
+    # Warm-up runs prime OS page cache / filesystem — the release binary's first
+    # mmap+exec page-faults hard, so the cold-start spike lands in the first
+    # measured run and poisons the volatility band (a run-01 p95 of ~48ms vs a
+    # ~15ms warm median, etc.). Their results are discarded. The very first
+    # invocation (warm-up if any, else run-01) carries the build.
+    first = True
+    for _ in range(max(0, warmup)):
+        warm_runtime = dataclasses.replace(runtime, root=runs_root / "warmup")
+        run_scenario(warm_runtime, build=build and first)
+        first = False
     results: list[ScenarioRunResult] = []
     for index in range(1, runs + 1):
         run_runtime = dataclasses.replace(
             runtime,
             root=runs_root / f"run-{index:02d}",
         )
-        results.append(run_scenario(run_runtime, build=build if index == 1 else False))
+        results.append(run_scenario(run_runtime, build=build and first))
+        first = False
     return aggregate_scenario_runs(runtime, results)
 
 
@@ -1337,7 +1350,9 @@ def command_matrix(args: argparse.Namespace) -> int:
             concurrency=scenario.default_concurrency,
             scenario=scenario,
         )
-        result = run_scenario_repeated(runtime, runs=args.runs, build=False)
+        result = run_scenario_repeated(
+            runtime, runs=args.runs, build=False, warmup=args.warmup
+        )
         reports.append(result.report)
     summary = {
         "generated_at": now_iso(),
@@ -1388,6 +1403,12 @@ def build_parser() -> argparse.ArgumentParser:
     matrix_parser.add_argument("--opa-port", type=int, default=18220)
     matrix_parser.add_argument("--presidio-port", type=int, default=19340)
     matrix_parser.add_argument("--runs", type=int, default=3)
+    matrix_parser.add_argument(
+        "--warmup",
+        type=int,
+        default=1,
+        help="discard N warm-up runs before measuring (primes page cache; default 1)",
+    )
     matrix_parser.set_defaults(func=command_matrix)
     return parser
 
