@@ -1,0 +1,114 @@
+name: bench-nightly
+
+# Real (relative) performance gate, kept OFF the PR critical path.
+#
+# Why a separate workflow: the PR/main `bench` job (ci.yml) self-seeds its
+# baseline from the same run, so its relative gate has no discrimination power —
+# it is a pure smoke test. This nightly job instead diffs the run against the
+# COMMITTED baseline (bench/baseline.json), so the relative regression gate has
+# a real reference and can catch large code regressions.
+#
+# Shared GitHub-hosted runners still flake on ABSOLUTE latency, so absolute
+# gates stay relaxed (warnings only, like ci.yml). The authority here is the
+# relative gate + its volatility-band guard, which on shared hardware reliably
+# catches multi-x regressions and tolerates noise. A failure opens/updates an
+# issue rather than blocking anything — nothing here is a required check.
+#
+# Precision absolute gating needs a dedicated/self-hosted runner; see
+# bench/README.md.
+
+on:
+  schedule:
+    # Daily 05:23 UTC — off the top of the hour to dodge scheduler congestion.
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: bench-nightly
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    name: nightly perf gate (committed baseline)
+    runs-on: ubuntu-latest
+    # Absolute ceilings relaxed for shared hardware; the relative gate vs the
+    # committed baseline is the real authority (see workflow header).
+    env:
+      BENCH_RPS_FLOOR_SCALE: "0.5"
+      BENCH_LATENCY_CEIL_SCALE: "2.0"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Seed committed baseline
+        # Pre-placing baseline.json makes the matrix step skip its self-seed
+        # (bench_harness.py: "if not baseline.json exists"), so the gate diffs
+        # the run against the committed reference instead of against itself.
+        run: |
+          mkdir -p .tmp-smoke/bench-matrix
+          cp bench/baseline.json .tmp-smoke/bench-matrix/baseline.json
+
+      - name: Run bench matrix
+        run: bash scripts/bench-matrix.sh
+
+      - name: Relative regression gate vs committed baseline
+        id: gate
+        run: bash scripts/bench-gate.sh
+
+      - name: Upload bench artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-nightly-${{ github.run_id }}
+          path: .tmp-smoke/bench-matrix
+          if-no-files-found: warn
+
+      - name: Open or refresh regression issue
+        if: failure() && steps.gate.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let detail = '_gate report unavailable_';
+            try {
+              const rep = JSON.parse(fs.readFileSync('.tmp-smoke/bench-matrix/gate-report.json', 'utf8'));
+              const fails = (rep.failures || []).map((f) => `- ${f}`).join('\n') || '- (no itemised failures)';
+              detail = `status: **${rep.status}**, regressions: **${rep.regressions}**\n\n${fails}`;
+            } catch (e) {
+              detail = `_could not read gate-report.json: ${e.message}_`;
+            }
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              'Nightly perf gate flagged a regression against the committed baseline (`bench/baseline.json`).',
+              '',
+              detail,
+              '',
+              `Run: ${runUrl}`,
+              '',
+              '> Shared GitHub-hosted runners have high variance — confirm against the uploaded artifact before acting.',
+              '> If the new numbers are the legitimate norm, re-promote the baseline (see `bench/README.md`).',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const existing = await github.rest.issues.listForRepo({
+              owner, repo, state: 'open', labels: 'perf-regression', per_page: 1,
+            });
+            if (existing.data.length) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.data[0].number, body });
+            } else {
+              await github.rest.issues.create({
+                owner, repo,
+                title: 'bench-nightly: performance regression vs committed baseline',
+                body,
+                labels: ['perf-regression'],
+              });
+            }

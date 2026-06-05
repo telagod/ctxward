@@ -1,0 +1,509 @@
+{
+  "generated_at": "2026-06-04T16:20:40.403218+00:00",
+  "scenario_count": 6,
+  "scenarios": [
+    {
+      "scenario": "json-redact",
+      "description": "JSON request/response redact hot path",
+      "requests": 80,
+      "concurrency": 8,
+      "throughput_rps": 683.47,
+      "latency_ms": {
+        "min": 6.374,
+        "p50": 11.233,
+        "p95": 15.167,
+        "max": 16.575,
+        "avg": 11.304
+      },
+      "payload_request_avg_ms": 0.15,
+      "payload_response_avg_ms": 0.16,
+      "upstream_avg_ms": 6.363,
+      "request_payload_kind": "json",
+      "decision_sources": {
+        "request": [
+          "builtin"
+        ],
+        "response": [
+          "builtin"
+        ]
+      },
+      "dependency_ready": {
+        "opa": false,
+        "presidio": false
+      },
+      "features": {
+        "attachment_scanning": false,
+        "opa": false,
+        "presidio": false,
+        "response_filtering": true,
+        "session_correlation": false,
+        "tokenization": false
+      },
+      "thresholds": {
+        "throughput_rps_min": 100.0,
+        "avg_ms_max": 40.0,
+        "p95_ms_max": 250.0,
+        "payload_request_avg_ms_max": 5.0,
+        "payload_response_avg_ms_max": 5.0,
+        "upstream_avg_ms_max": 20.0
+      },
+      "ok": true,
+      "aggregation": {
+        "method": "median",
+        "runs": 3,
+        "sample_runs": [
+          {
+            "run": "run-01",
+            "throughput_rps": 512.4,
+            "avg_ms": 15.009,
+            "p95_ms": 47.952,
+            "payload_request_avg_ms": 0.158,
+            "payload_response_avg_ms": 0.17,
+            "upstream_avg_ms": 10.092,
+            "ok": true
+          },
+          {
+            "run": "run-02",
+            "throughput_rps": 683.47,
+            "avg_ms": 11.304,
+            "p95_ms": 15.167,
+            "payload_request_avg_ms": 0.15,
+            "payload_response_avg_ms": 0.16,
+            "upstream_avg_ms": 6.363,
+            "ok": true
+          },
+          {
+            "run": "run-03",
+            "throughput_rps": 686.99,
+            "avg_ms": 11.185,
+            "p95_ms": 14.849,
+            "payload_request_avg_ms": 0.141,
+            "payload_response_avg_ms": 0.158,
+            "upstream_avg_ms": 6.181,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "json-tokenize",
+      "description": "JSON request tokenization + response redact",
+      "requests": 80,
+      "concurrency": 8,
+      "throughput_rps": 77.0,
+      "latency_ms": {
+        "min": 7.967,
+        "p50": 11.098,
+        "p95": 13.929,
+        "max": 395.499,
+        "avg": 22.598
+      },
+      "payload_request_avg_ms": 0.229,
+      "payload_response_avg_ms": 0.218,
+      "upstream_avg_ms": 18.201,
+      "request_payload_kind": "json",
+      "decision_sources": {
+        "request": [
+          "builtin"
+        ],
+        "response": [
+          "builtin"
+        ]
+      },
+      "dependency_ready": {
+        "opa": false,
+        "presidio": false
+      },
+      "features": {
+        "attachment_scanning": false,
+        "opa": false,
+        "presidio": false,
+        "response_filtering": true,
+        "session_correlation": false,
+        "tokenization": true
+      },
+      "thresholds": {
+        "throughput_rps_min": 90.0,
+        "avg_ms_max": 50.0,
+        "p95_ms_max": 280.0,
+        "payload_request_avg_ms_max": 8.0,
+        "payload_response_avg_ms_max": 5.0,
+        "upstream_avg_ms_max": 20.0
+      },
+      "ok": true,
+      "aggregation": {
+        "method": "median",
+        "runs": 3,
+        "sample_runs": [
+          {
+            "run": "run-01",
+            "throughput_rps": 77.0,
+            "avg_ms": 22.598,
+            "p95_ms": 12.663,
+            "payload_request_avg_ms": 0.229,
+            "payload_response_avg_ms": 0.218,
+            "upstream_avg_ms": 18.201,
+            "ok": true
+          },
+          {
+            "run": "run-02",
+            "throughput_rps": 674.7,
+            "avg_ms": 11.358,
+            "p95_ms": 13.929,
+            "payload_request_avg_ms": 0.2,
+            "payload_response_avg_ms": 0.213,
+            "upstream_avg_ms": 6.417,
+            "ok": true
+          },
+          {
+            "run": "run-03",
+            "throughput_rps": 74.35,
+            "avg_ms": 107.045,
+            "p95_ms": 392.295,
+            "payload_request_avg_ms": 0.251,
+            "payload_response_avg_ms": 0.255,
+            "upstream_avg_ms": 101.693,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "json-review-replay",
+      "description": "Review create/approve prime + replay override hot path",
+      "requests": 60,
+      "concurrency": 6,
+      "throughput_rps": 710.27,
+      "latency_ms": {
+        "min": 5.273,
+        "p50": 7.964,
+        "p95": 10.445,
+        "max": 11.797,
+        "avg": 8.144
+      },
+      "payload_request_avg_ms": 0.151,
+      "payload_response_avg_ms": 0.156,
+      "upstream_avg_ms": 4.447,
+      "request_payload_kind": "json",
+      "decision_sources": {
+        "request": [
+          "builtin",
+          "review_override_approved"
+        ],
+        "response": [
+          "builtin"
+        ]
+      },
+      "dependency_ready": {
+        "opa": false,
+        "presidio": false
+      },
+      "features": {
+        "attachment_scanning": false,
+        "opa": false,
+        "presidio": false,
+        "response_filtering": true,
+        "session_correlation": true,
+        "tokenization": false
+      },
+      "thresholds": {
+        "throughput_rps_min": 80.0,
+        "avg_ms_max": 60.0,
+        "p95_ms_max": 320.0,
+        "payload_request_avg_ms_max": 8.0,
+        "payload_response_avg_ms_max": 5.0,
+        "upstream_avg_ms_max": 20.0
+      },
+      "ok": true,
+      "aggregation": {
+        "method": "median",
+        "runs": 3,
+        "sample_runs": [
+          {
+            "run": "run-01",
+            "throughput_rps": 263.35,
+            "avg_ms": 22.38,
+            "p95_ms": 112.554,
+            "payload_request_avg_ms": 0.146,
+            "payload_response_avg_ms": 0.187,
+            "upstream_avg_ms": 18.662,
+            "ok": true
+          },
+          {
+            "run": "run-02",
+            "throughput_rps": 710.27,
+            "avg_ms": 8.144,
+            "p95_ms": 10.445,
+            "payload_request_avg_ms": 0.151,
+            "payload_response_avg_ms": 0.155,
+            "upstream_avg_ms": 4.447,
+            "ok": true
+          },
+          {
+            "run": "run-03",
+            "throughput_rps": 722.26,
+            "avg_ms": 7.903,
+            "p95_ms": 10.184,
+            "payload_request_avg_ms": 0.16,
+            "payload_response_avg_ms": 0.156,
+            "upstream_avg_ms": 4.434,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "json-opa",
+      "description": "JSON redact with OPA sidecar decision on request/response",
+      "requests": 60,
+      "concurrency": 6,
+      "throughput_rps": 357.5,
+      "latency_ms": {
+        "min": 10.446,
+        "p50": 16.372,
+        "p95": 20.215,
+        "max": 22.679,
+        "avg": 16.354
+      },
+      "payload_request_avg_ms": 0.168,
+      "payload_response_avg_ms": 0.162,
+      "upstream_avg_ms": 4.562,
+      "request_payload_kind": "json",
+      "decision_sources": {
+        "request": [
+          "opa"
+        ],
+        "response": [
+          "opa"
+        ]
+      },
+      "dependency_ready": {
+        "opa": true,
+        "presidio": false
+      },
+      "features": {
+        "attachment_scanning": false,
+        "opa": true,
+        "presidio": false,
+        "response_filtering": true,
+        "session_correlation": false,
+        "tokenization": false
+      },
+      "thresholds": {
+        "throughput_rps_min": 70.0,
+        "avg_ms_max": 70.0,
+        "p95_ms_max": 350.0,
+        "payload_request_avg_ms_max": 8.0,
+        "payload_response_avg_ms_max": 5.0,
+        "upstream_avg_ms_max": 25.0
+      },
+      "ok": true,
+      "aggregation": {
+        "method": "median",
+        "runs": 3,
+        "sample_runs": [
+          {
+            "run": "run-01",
+            "throughput_rps": 357.59,
+            "avg_ms": 16.309,
+            "p95_ms": 20.215,
+            "payload_request_avg_ms": 0.18,
+            "payload_response_avg_ms": 0.169,
+            "upstream_avg_ms": 4.562,
+            "ok": true
+          },
+          {
+            "run": "run-02",
+            "throughput_rps": 349.05,
+            "avg_ms": 16.713,
+            "p95_ms": 20.383,
+            "payload_request_avg_ms": 0.167,
+            "payload_response_avg_ms": 0.162,
+            "upstream_avg_ms": 4.622,
+            "ok": true
+          },
+          {
+            "run": "run-03",
+            "throughput_rps": 357.5,
+            "avg_ms": 16.354,
+            "p95_ms": 18.939,
+            "payload_request_avg_ms": 0.168,
+            "payload_response_avg_ms": 0.158,
+            "upstream_avg_ms": 4.467,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "json-presidio",
+      "description": "JSON redact driven only by Presidio sidecar detections",
+      "requests": 40,
+      "concurrency": 4,
+      "throughput_rps": 184.88,
+      "latency_ms": {
+        "min": 15.667,
+        "p50": 21.099,
+        "p95": 24.154,
+        "max": 25.984,
+        "avg": 21.07
+      },
+      "payload_request_avg_ms": 5.08,
+      "payload_response_avg_ms": 9.864,
+      "upstream_avg_ms": 3.415,
+      "request_payload_kind": "json",
+      "decision_sources": {
+        "request": [
+          "builtin"
+        ],
+        "response": [
+          "builtin"
+        ]
+      },
+      "dependency_ready": {
+        "opa": false,
+        "presidio": true
+      },
+      "features": {
+        "attachment_scanning": false,
+        "opa": false,
+        "presidio": true,
+        "response_filtering": true,
+        "session_correlation": false,
+        "tokenization": false
+      },
+      "thresholds": {
+        "throughput_rps_min": 45.0,
+        "avg_ms_max": 90.0,
+        "p95_ms_max": 450.0,
+        "payload_request_avg_ms_max": 20.0,
+        "payload_response_avg_ms_max": 20.0,
+        "upstream_avg_ms_max": 25.0
+      },
+      "ok": true,
+      "aggregation": {
+        "method": "median",
+        "runs": 3,
+        "sample_runs": [
+          {
+            "run": "run-01",
+            "throughput_rps": 181.81,
+            "avg_ms": 21.563,
+            "p95_ms": 24.09,
+            "payload_request_avg_ms": 5.172,
+            "payload_response_avg_ms": 10.172,
+            "upstream_avg_ms": 3.589,
+            "ok": true
+          },
+          {
+            "run": "run-02",
+            "throughput_rps": 189.53,
+            "avg_ms": 20.803,
+            "p95_ms": 24.154,
+            "payload_request_avg_ms": 5.08,
+            "payload_response_avg_ms": 9.864,
+            "upstream_avg_ms": 3.332,
+            "ok": true
+          },
+          {
+            "run": "run-03",
+            "throughput_rps": 184.88,
+            "avg_ms": 21.07,
+            "p95_ms": 24.461,
+            "payload_request_avg_ms": 5.066,
+            "payload_response_avg_ms": 9.777,
+            "upstream_avg_ms": 3.415,
+            "ok": true
+          }
+        ]
+      }
+    },
+    {
+      "scenario": "pdf-redact",
+      "description": "Multipart PDF simple-text rewrite + response redact",
+      "requests": 20,
+      "concurrency": 2,
+      "throughput_rps": 196.23,
+      "latency_ms": {
+        "min": 8.873,
+        "p50": 9.797,
+        "p95": 13.034,
+        "max": 13.481,
+        "avg": 10.113
+      },
+      "payload_request_avg_ms": 3.961,
+      "payload_response_avg_ms": 0.145,
+      "upstream_avg_ms": 4.739,
+      "request_payload_kind": "multipart",
+      "decision_sources": {
+        "request": [
+          "builtin"
+        ],
+        "response": [
+          "builtin"
+        ]
+      },
+      "dependency_ready": {
+        "opa": false,
+        "presidio": false
+      },
+      "features": {
+        "attachment_scanning": true,
+        "opa": false,
+        "presidio": false,
+        "response_filtering": true,
+        "session_correlation": false,
+        "tokenization": false
+      },
+      "thresholds": {
+        "throughput_rps_min": 10.0,
+        "avg_ms_max": 180.0,
+        "p95_ms_max": 800.0,
+        "payload_request_avg_ms_max": 80.0,
+        "payload_response_avg_ms_max": 10.0,
+        "upstream_avg_ms_max": 30.0
+      },
+      "ok": true,
+      "aggregation": {
+        "method": "median",
+        "runs": 3,
+        "sample_runs": [
+          {
+            "run": "run-01",
+            "throughput_rps": 201.52,
+            "avg_ms": 9.779,
+            "p95_ms": 13.034,
+            "payload_request_avg_ms": 3.945,
+            "payload_response_avg_ms": 0.152,
+            "upstream_avg_ms": 4.293,
+            "ok": true
+          },
+          {
+            "run": "run-02",
+            "throughput_rps": 193.96,
+            "avg_ms": 10.213,
+            "p95_ms": 12.02,
+            "payload_request_avg_ms": 3.974,
+            "payload_response_avg_ms": 0.145,
+            "upstream_avg_ms": 4.74,
+            "ok": true
+          },
+          {
+            "run": "run-03",
+            "throughput_rps": 196.23,
+            "avg_ms": 10.113,
+            "p95_ms": 13.315,
+            "payload_request_avg_ms": 3.961,
+            "payload_response_avg_ms": 0.127,
+            "upstream_avg_ms": 4.739,
+            "ok": true
+          }
+        ]
+      }
+    }
+  ],
+  "aggregation": {
+    "method": "median",
+    "runs": 3
+  }
+}
