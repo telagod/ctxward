@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ctxward — a data-plane privacy firewall for LLM traffic</title>
+    <meta name="description" content="Ctxward detects, redacts and tokenizes PII, secrets and internal identifiers in LLM prompts before they leave your machine. One Rust core, two shells: a transparent desktop client (Clash-style) and a reverse-proxy gateway. This page tracks the productization progress." />
+    <meta property="og:title" content="Ctxward — privacy firewall for LLM traffic" />
+    <meta property="og:description" content="Detect → redact → tokenize → review → forward. One core, two shells. Productization progress tracker." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://telagod.github.io/ctxward/" />
+    <meta name="theme-color" content="#0b0e14" />
+    <style>
+      :root {
+        --bg: #0b0e14; --bg2: #0f141d; --card: #131822; --card2: #171d28;
+        --border: #232b38; --border2: #2d3645;
+        --fg: #e6e9ef; --muted: #8b94a7; --faint: #858f9f;
+        --accent: #5b9dff; --accent2: #7c5bff;
+        --done: #3fb950; --build: #58a6ff; --prog: #d29922; --plan: #6e7681;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      * { box-sizing: border-box; }
+      @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+      body {
+        margin: 0; background: var(--bg); color: var(--fg);
+        font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 0 22px; }
+      .mono { font-family: var(--mono); }
+
+      header.hero {
+        background:
+          radial-gradient(1200px 500px at 70% -10%, rgba(91,157,255,.14), transparent 60%),
+          radial-gradient(900px 400px at 10% 0%, rgba(124,91,255,.10), transparent 55%);
+        border-bottom: 1px solid var(--border);
+        padding: 64px 0 52px;
+      }
+      .eyebrow { color: var(--accent); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; margin: 0 0 14px; }
+      h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.12; margin: 0 0 16px; letter-spacing: -.02em; }
+      h1 .grad { background: linear-gradient(90deg, #7cb8ff, #b29bff); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+      .lede { font-size: 18px; color: var(--muted); max-width: 640px; margin: 0 0 22px; }
+      .pipeline { font-family: var(--mono); font-size: 14px; color: var(--fg); background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: inline-block; margin-bottom: 24px; }
+      .pipeline b { color: var(--accent); }
+      .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+      .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-weight: 600; font-size: 14px; border: 1px solid var(--border2); }
+      .btn.primary { background: var(--accent); color: #06122b; border-color: transparent; }
+      .btn.primary:hover { background: #74acff; text-decoration: none; }
+      .btn.ghost { color: var(--fg); background: var(--card); }
+      .btn.ghost:hover { background: var(--card2); text-decoration: none; }
+      .badges { margin-top: 22px; display: flex; gap: 8px; flex-wrap: wrap; }
+      .badges img { height: 20px; }
+
+      section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+      h2 { font-size: 24px; margin: 0 0 6px; letter-spacing: -.01em; }
+      .sub { color: var(--muted); margin: 0 0 26px; }
+
+      .arch { display: grid; grid-template-columns: 1fr; gap: 14px; }
+      .core { background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--border2); border-radius: 12px; padding: 18px 20px; }
+      .core .k { color: var(--accent); font-weight: 700; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+      .core .caps { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-top: 8px; }
+      .shells { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .shell { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+      .shell h3 { margin: 0 0 4px; font-size: 17px; }
+      .shell .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; }
+      .tag.main { background: rgba(63,185,80,.15); color: #6cd081; }
+      .tag.sec { background: rgba(110,118,129,.18); color: #9aa4b2; }
+      .shell p { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+
+      .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 0 0 22px; font-size: 13px; color: var(--muted); }
+      .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+      .dot.done { background: var(--done); } .dot.build { background: var(--build); }
+      .dot.prog { background: var(--prog); } .dot.plan { background: var(--plan); }
+
+      .phase-meter { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 26px; }
+      .phase-meter .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+      .phase-meter .row .t { font-weight: 600; }
+      .phase-meter .row .pct { font-family: var(--mono); color: var(--done); font-weight: 700; }
+      .bar { height: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+      .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--done), #58c06e); }
+      .phase-meter .note { color: var(--faint); font-size: 13px; margin: 12px 0 0; }
+
+      .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--border2); border-radius: 10px; padding: 14px 16px; }
+      .card.s-done { border-left-color: var(--done); }
+      .card.s-build { border-left-color: var(--build); }
+      .card.s-prog { border-left-color: var(--prog); }
+      .card.s-plan { border-left-color: var(--plan); opacity: .92; }
+      .card .h { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+      .card .h .name { font-weight: 600; font-size: 15px; }
+      .card .st { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+      .st.done { color: var(--done); } .st.build { color: var(--build); }
+      .st.prog { color: var(--prog); } .st.plan { color: var(--plan); }
+      .card p { color: var(--muted); font-size: 13.5px; margin: 8px 0 0; }
+      .card .ev { margin-top: 8px; font-size: 12px; }
+      .card .ev a { font-family: var(--mono); color: var(--faint); }
+      .card .ev a:hover { color: var(--accent); }
+
+      ul.feat { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 22px; }
+      ul.feat li { color: var(--muted); font-size: 14px; padding-left: 20px; position: relative; }
+      ul.feat li::before { content: "▸"; color: var(--accent); position: absolute; left: 0; }
+      ul.feat li b { color: var(--fg); font-weight: 600; }
+
+      .next { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .next .item { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; }
+      .next .item .lbl { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+      .next .item.now .lbl { color: var(--prog); } .next .item.v2 .lbl { color: var(--plan); }
+      .next .item .name { font-weight: 600; margin: 4px 0 2px; }
+      .next .item p { color: var(--muted); font-size: 13px; margin: 0; }
+
+      .callout { background: linear-gradient(180deg, rgba(210,153,34,.08), transparent); border: 1px solid var(--border2); border-radius: 10px; padding: 14px 16px; color: var(--muted); font-size: 14px; }
+      .callout b { color: var(--fg); }
+
+      footer { padding: 40px 0 60px; color: var(--faint); font-size: 13px; }
+      footer .links { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; }
+
+      @media (max-width: 680px) {
+        .shells, .cards, .next, ul.feat { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Open-source · Rust · pre-1.0</p>
+        <h1>A data-plane privacy firewall<br /><span class="grad">for LLM traffic.</span></h1>
+        <p class="lede">Every prompt your apps send to OpenAI, Anthropic, Gemini and friends — scanned, redacted and tokenized <em>before it leaves your machine</em>. No SDK changes. The model never sees the raw PII.</p>
+        <div class="pipeline mono">Detect&nbsp;→&nbsp;<b>redact</b>&nbsp;→&nbsp;<b>tokenize</b>&nbsp;→&nbsp;review&nbsp;→&nbsp;forward</div>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/telagod/ctxward">★ View on GitHub</a>
+          <a class="btn ghost" href="#progress">Productization progress ↓</a>
+        </div>
+        <div class="badges">
+          <a href="https://github.com/telagod/ctxward/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/telagod/ctxward/actions/workflows/ci.yml/badge.svg" /></a>
+          <a href="https://github.com/telagod/ctxward/actions/workflows/security.yml"><img alt="security" src="https://github.com/telagod/ctxward/actions/workflows/security.yml/badge.svg" /></a>
+          <img alt="license MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" />
+          <img alt="version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-informational" />
+        </div>
+      </div>
+    </header>
+
+    <section id="idea">
+      <div class="wrap">
+        <h2>One core, two shells</h2>
+        <p class="sub">The model is <span class="mono">Clash for LLM privacy</span> — borrow the architecture, not the brand. A mature Rust engine is the single source of truth; two delivery shells sit on top of the same policy semantics and label set.</p>
+        <div class="arch">
+          <div class="core">
+            <span class="k">Ctxward Core — Rust engine</span>
+            <div class="caps">detect · redact · tokenize · review · policy · audit · OPA strict-merge · session correlation · attachment scan · SSE</div>
+          </div>
+          <div class="shells">
+            <div class="shell">
+              <h3>Desktop <span class="tag main">main line</span></h3>
+              <p>Transparent take-over (Tauri shell): system proxy + local root CA, MITM only on whitelisted LLM SNIs. Single-user, single-machine. The open-source growth engine.</p>
+            </div>
+            <div class="shell">
+              <h3>Gateway <span class="tag sec">secondary</span></h3>
+              <p>Explicit reverse proxy, headless, multi-tenant per-Bearer. Kubernetes / server. The enterprise monetization line.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="progress">
+      <div class="wrap">
+        <h2>Productization progress</h2>
+        <p class="sub">Phase&nbsp;1 scope (locked): <b>Desktop on Win/Mac/Linux + a browser extension.</b> Mobile is Phase&nbsp;2. Status reflects what is in <code>main</code> today — links point at the merged PRs.</p>
+
+        <div class="legend">
+          <span><i class="dot done"></i>Shipped &amp; verified</span>
+          <span><i class="dot build"></i>Built — runtime/release pending</span>
+          <span><i class="dot prog"></i>In progress / next</span>
+          <span><i class="dot plan"></i>Planned (Phase 2+)</span>
+        </div>
+
+        <div class="phase-meter">
+          <div class="row"><span class="t">Engine &amp; data-plane</span><span class="pct">production-ready</span></div>
+          <div class="bar"><i style="width:100%"></i></div>
+          <div class="row" style="margin-top:16px"><span class="t">Phase 1 client (desktop + extension)</span><span class="pct" style="color:var(--prog)">feature-complete · pre-release</span></div>
+          <div class="bar"><i style="width:78%; background:linear-gradient(90deg,var(--build),var(--prog));"></i></div>
+          <p class="note">Engine and all desktop milestones (D1–D4) are merged. What stands between here and a shippable 1.0: cross-platform installer CI, GUI runtime validation on a real desktop session, and extension store submission.</p>
+        </div>
+
+        <div class="cards">
+          <div class="card s-done">
+            <div class="h"><span class="name">Engine core</span><span class="st done">● shipped</span></div>
+            <p>detect / redact / tokenize / review / policy / audit / OPA. Reversible AES-GCM-SIV tokenization, session correlation, OOXML+PDF attachment rewrite. v0.2.0 · 100+ tests green.</p>
+          </div>
+          <div class="card s-done">
+            <div class="h"><span class="name">D1 · Transparent MITM proxy</span><span class="st done">● shipped</span></div>
+            <p>CONNECT hijack, per-SNI cert gen, LLM-provider whitelist (hit → redact pipeline, miss → passthrough). Local root CA, key never leaves the machine. Runtime-proven + adversarially hardened.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/1">#1</a></div>
+          </div>
+          <div class="card s-done">
+            <div class="h"><span class="name">D1.5 · Streaming SSE redaction</span><span class="st done">● shipped</span></div>
+            <p>Per-event redaction over server-sent streams with a stream-aware fail-safe — never a mid-stream 502. Tail usage metering.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/4">#4</a></div>
+          </div>
+          <div class="card s-build">
+            <div class="h"><span class="name">D2 · Desktop shell (Tauri)</span><span class="st build">● built</span></div>
+            <p>Tray, proxy lifecycle, CA install/uninstall, system-proxy toggle (one elevation batch), live audit feed, exit teardown. Compiles + packaged as a <code>.deb</code>. Runtime validation on a real GTK session still pending.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/7">#7</a> · <a href="https://github.com/telagod/ctxward/pull/8">#8 (.deb)</a></div>
+          </div>
+          <div class="card s-build">
+            <div class="h"><span class="name">D3 · Browser extension</span><span class="st build">● scaffold</span></div>
+            <p>MV3 extension: MAIN-world fetch/XHR patch ↔ ISOLATED-world WASM bridge, fail-closed, reusing the core label set. Not yet submitted to the web stores.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/6">#6</a></div>
+          </div>
+          <div class="card s-done">
+            <div class="h"><span class="name">D4 · Rule-set + metering</span><span class="st done">● shipped</span></div>
+            <p>ed25519-signed, hot-updatable provider rule-set (fail-closed, immutable baked-in floor) + token/cost metering counters for the retention dashboard.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/2">#2</a> · <a href="https://github.com/telagod/ctxward/pull/3">#3</a></div>
+          </div>
+          <div class="card s-done">
+            <div class="h"><span class="name">Core extraction (Phase B)</span><span class="st done">● shipped</span></div>
+            <p><code>ctxward-core</code> crate split out of the gateway — pure engine, compiles to <code>wasm32</code> for the extension. Zero import churn via re-exports.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/5">#5</a></div>
+          </div>
+          <div class="card s-done">
+            <div class="h"><span class="name">CI &amp; nightly perf gate</span><span class="st done">● shipped</span></div>
+            <p>DCO, cargo-deny/audit, gitleaks, clippy. A nightly relative-regression gate against a warm committed baseline, debounced against shared-runner noise.</p>
+            <div class="ev"><a href="https://github.com/telagod/ctxward/pull/10">#10</a> · <a href="https://github.com/telagod/ctxward/pull/13">#13</a> · <a href="https://github.com/telagod/ctxward/pull/14">#14</a></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="shipped">
+      <div class="wrap">
+        <h2>What the engine already does</h2>
+        <p class="sub">The data plane is production-ready and runs today as a reverse proxy (<code>docker compose up</code>).</p>
+        <ul class="feat">
+          <li><b>Language-agnostic</b> — apps stay unchanged, no SDK wrapper</li>
+          <li><b>Recursive scan</b> — messages, JSON, SSE, multipart attachments</li>
+          <li><b>Five decisions</b> — allow / redact / tokenize / review / block</li>
+          <li><b>OPA strict-merge</b> — built-in policy first, strictest wins</li>
+          <li><b>Reversible tokens</b> — AES-GCM-SIV, key from env, never disk</li>
+          <li><b>Review queue</b> — 409 + ticket, replay after approval</li>
+          <li><b>Audit</b> — hashes &amp; labels only, never raw values</li>
+          <li><b>Observable</b> — Prometheus, /readyz probe, /admin console</li>
+          <li><b>OOXML &amp; PDF</b> — node-level rewrite of docx/xlsx/pptx</li>
+          <li><b>Supply chain</b> — cosign-signed images, CycloneDX SBOM</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <div class="wrap">
+        <h2>Road to GA</h2>
+        <p class="sub">What stands between the current <code>main</code> and a 1.0 users can install.</p>
+        <div class="next">
+          <div class="item now">
+            <div class="lbl">Next up</div>
+            <div class="name">Desktop release CI</div>
+            <p>tauri-action producing <code>.deb</code>/<code>.dmg</code>/<code>.msi</code> per platform, attached to GitHub Releases on tag — so users can actually download an installer.</p>
+          </div>
+          <div class="item now">
+            <div class="lbl">Next up</div>
+            <div class="name">GUI runtime validation</div>
+            <p>Exercise the Tauri shell on real Win/Mac/Linux sessions: tray, the elevation prompt, CA install, live audit feed.</p>
+          </div>
+          <div class="item now">
+            <div class="lbl">Hardening</div>
+            <div class="name">cert-pinning fallback &amp; in-app review</div>
+            <p>Graceful passthrough for pinned hosts (ChatGPT desktop), and a native approval dialog replacing the HTTP review ticket.</p>
+          </div>
+          <div class="item v2">
+            <div class="lbl">Phase 2</div>
+            <div class="name">L3 TUN take-over</div>
+            <p>Virtual NIC for apps with hard-coded endpoints that ignore the system proxy.</p>
+          </div>
+          <div class="item v2">
+            <div class="lbl">Phase 2</div>
+            <div class="name">Mobile</div>
+            <p>Android via <code>VpnService</code> with the core compiled in; iOS deferred (Network Extension + CA profile constraints).</p>
+          </div>
+          <div class="item v2">
+            <div class="lbl">Enterprise</div>
+            <div class="name">Control plane</div>
+            <p>Multi-instance review backend, KMS-managed keys, SSO, and central policy push across an org's desktop clients.</p>
+          </div>
+        </div>
+        <p style="margin-top:22px" class="callout"><b>Honest status:</b> the engine is solid and the desktop client is feature-complete in source, but it is <b>pre-release</b> — there are no published installers yet and the GUI hasn't been exercised on a real desktop session in CI. Treat it as a build-it-yourself preview, not a finished app.</p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <div class="links">
+          <a href="https://github.com/telagod/ctxward">GitHub</a>
+          <a href="https://github.com/telagod/ctxward/blob/main/docs/proposals/product-shape.md">Product shape</a>
+          <a href="https://github.com/telagod/ctxward/blob/main/DESIGN.md">Design &amp; threat model</a>
+          <a href="https://github.com/telagod/ctxward/blob/main/SECURITY.md">Security</a>
+          <a href="https://github.com/telagod/ctxward/blob/main/PRIVACY.md">Privacy</a>
+        </div>
+        Ctxward is MIT-licensed and pre-1.0. The trust model for the desktop client is load-bearing: the root CA key is generated locally and never leaves the machine, MITM decryption is restricted to whitelisted LLM SNIs, and everything is open to audit. A privacy tool you can't inspect is just a backdoor.
+      </div>
+    </footer>
+  </body>
+</html>
