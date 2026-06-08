@@ -10,6 +10,12 @@ edition = "2024"
 description = "Ctxward Desktop — Clash-style transparent LLM-privacy gateway (Tauri shell)"
 license = "Apache-2.0"
 
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+opt-level = "s"
+
 [lib]
 name = "ctxward_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
