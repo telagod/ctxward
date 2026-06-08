@@ -51,6 +51,39 @@ Other targets: `--bundles appimage` (Linux, downloads linuxdeploy), `dmg`
 (macOS), `msi`/`nsis` (Windows). `config/example.yaml` is the default config
 (`CONTEXT_GURD_CONFIG` overrides); set `mode: proxy` to run as the gateway.
 
+## Installing pre-built releases
+
+Download installers from [GitHub Releases](https://github.com/telagod/ctxward/releases).
+
+| Platform | File | Install |
+|----------|------|---------|
+| **Linux (Debian/Ubuntu)** | `Ctxward_*_amd64.deb` | `sudo apt install ./Ctxward_*.deb` |
+| **Linux (universal)** | `Ctxward_*_amd64.AppImage` | `chmod +x *.AppImage && ./*.AppImage` |
+| **macOS** | `Ctxward_*_aarch64.dmg` | Open the `.dmg`, drag to Applications |
+| **Windows** | `Ctxward_*_x64-setup.exe` | Run the installer |
+
+### Unsigned builds (pre-1.0)
+
+The installers are **not code-signed yet** (no Apple Developer ID / no Windows
+Authenticode certificate). Your OS will warn you on first launch:
+
+**macOS** — Gatekeeper blocks unsigned apps by default:
+```
+1. Right-click (or Ctrl+click) the app → "Open"
+2. Click "Open" in the confirmation dialog
+```
+You only need to do this once; macOS remembers the exception. Alternatively:
+`xattr -cr /Applications/Ctxward.app`
+
+**Windows** — SmartScreen shows "Windows protected your PC":
+```
+1. Click "More info"
+2. Click "Run anyway"
+```
+
+Code signing will be added before GA. The app is open-source and reproducible
+from this repo — inspect before you trust.
+
 ## Done
 
 - Tray menu (Start / Stop / Open / Quit) — menu-driven (Linux click events are
