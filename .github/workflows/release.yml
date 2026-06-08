@@ -254,6 +254,24 @@ jobs:
       - name: Install tauri-cli
         run: cargo install tauri-cli --version '^2' --locked
 
+      # Windows MSI requires numeric-only versions (no "rc.1" etc.).
+      # Strip the SemVer pre-release suffix from tauri.conf.json before
+      # building so installers get e.g. "0.3.0" even on a "v0.3.0-rc.1" tag.
+      - name: Normalize version for installers
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CLEAN="${VERSION%%-*}"
+          echo "installer version: $CLEAN (from tag $GITHUB_REF_NAME)"
+          python3 -c "
+          import json, sys
+          p = 'desktop/src-tauri/tauri.conf.json'
+          d = json.load(open(p))
+          d['version'] = '$CLEAN'
+          open(p,'w').write(json.dumps(d,indent=2)+'\n')
+          print('tauri.conf.json version set to', d['version'])
+          "
+
       - name: Build desktop installers
         working-directory: desktop/src-tauri
         run: cargo tauri build
@@ -286,6 +304,10 @@ jobs:
   publish-release:
     name: gh release
     needs: [build-binaries, sbom, build-desktop]
+    # Desktop builds are fail-fast: false — if one platform fails (e.g. Windows
+    # MSI version constraint), the release still publishes with the platforms
+    # that succeeded. All gateway binaries + SBOM are always present.
+    if: always() && needs.build-binaries.result != 'failure' && needs.sbom.result != 'failure'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
