@@ -18,7 +18,7 @@ yanked = "deny"
 ignore = []
 
 # ----------------------------------------------------------------------------
-# licenses — Ctxward ships under MIT. Allow common permissive licenses;
+# licenses — Ctxward ships under Apache-2.0. Allow common permissive licenses;
 # require explicit decision on copyleft.
 # ----------------------------------------------------------------------------
 [licenses]

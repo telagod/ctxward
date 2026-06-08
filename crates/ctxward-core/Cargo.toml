@@ -2,7 +2,7 @@
 name = "ctxward-core"
 version = "0.2.0"
 edition = "2024"
-license = "MIT"
+license = "Apache-2.0"
 description = "Ctxward core: detection, redaction, reversible tokenization, policy, and config types — no network/server IO, reusable from the gateway, the desktop shell, and (compiled to WASM) the browser extension."
 rust-version = "1.85"
 
