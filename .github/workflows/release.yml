@@ -283,7 +283,6 @@ jobs:
           mkdir -p desktop-dist
           if [ "$RUNNER_OS" = "Linux" ]; then
             cp desktop/src-tauri/target/release/bundle/deb/*.deb desktop-dist/ 2>/dev/null || true
-            cp desktop/src-tauri/target/release/bundle/appimage/*.AppImage desktop-dist/ 2>/dev/null || true
           elif [ "$RUNNER_OS" = "macOS" ]; then
             cp desktop/src-tauri/target/release/bundle/dmg/*.dmg desktop-dist/ 2>/dev/null || true
           elif [ "$RUNNER_OS" = "Windows" ]; then
@@ -320,7 +319,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name '*.tar.gz' -o -name '*.cdx.json' -o -name '*.deb' -o -name '*.dmg' -o -name '*.msi' -o -name '*.AppImage' -o -name '*.exe' \) -exec cp {} release/ \;
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.cdx.json' -o -name '*.deb' -o -name '*.dmg' -o -name '*.msi' -o -name '*.exe' \) -exec cp {} release/ \;
           (cd release && shasum -a 256 * > SHA256SUMS)
 
       - name: Create or update GitHub Release
