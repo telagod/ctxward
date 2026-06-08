@@ -8,7 +8,7 @@ name = "ctxward-desktop"
 version = "0.2.0"
 edition = "2024"
 description = "Ctxward Desktop — Clash-style transparent LLM-privacy gateway (Tauri shell)"
-license = "MIT"
+license = "Apache-2.0"
 
 [lib]
 name = "ctxward_desktop_lib"

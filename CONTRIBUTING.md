@@ -67,4 +67,4 @@ We do **not** require a CLA.
 
 ## License
 
-By contributing, you agree your contributions are licensed under the MIT License (see [`LICENSE`](LICENSE)).
+By contributing, you agree your contributions are licensed under the Apache License 2.0 (see [`LICENSE`](LICENSE)). For the open-core model and commercial boundaries, see [`LICENSING.md`](LICENSING.md).

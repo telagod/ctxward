@@ -4,7 +4,8 @@ All notable changes to **Ctxward** are documented here. Format follows [Keep a C
 
 ## [Unreleased]
 
-_(no changes since the last release)_
+### Changed
+- **License: MIT → Apache-2.0.** Adds explicit patent grant (Section 3) and trademark clarity (Section 6). The relicense was performed by the sole copyright holder; all prior commits are by the same author. See [`LICENSING.md`](LICENSING.md) for the open-core model, core competitive advantages, and commercial boundaries.
 
 ## [0.2.0] — 2026-05-23
 

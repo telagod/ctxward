@@ -5,7 +5,7 @@
 [![ci](https://github.com/telagod/ctxward/actions/workflows/ci.yml/badge.svg)](https://github.com/telagod/ctxward/actions/workflows/ci.yml)
 [![security](https://github.com/telagod/ctxward/actions/workflows/security.yml/badge.svg)](https://github.com/telagod/ctxward/actions/workflows/security.yml)
 [![release](https://github.com/telagod/ctxward/actions/workflows/release.yml/badge.svg)](https://github.com/telagod/ctxward/actions/workflows/release.yml)
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![image](https://img.shields.io/badge/image-ghcr.io%2Fctxward-informational)](https://github.com/telagod/ctxward/pkgs/container/ctxward)
 
 > ⚠️ **Status: pre-1.0.** Stable internal mechanics, deliberately small public surface. The crate name `context-gurd`, the `CONTEXT_GURD_*` env vars, the `gateway_*` Prometheus names, and the `x-privacy-gateway-*` headers will keep working for the entire 0.x line; renames go through a deprecation cycle. See [`CHANGELOG.md`](CHANGELOG.md).
@@ -137,4 +137,4 @@ Security issues: **do not open a public issue**, see [`SECURITY.md`](SECURITY.md
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+Apache-2.0 — see [`LICENSE`](LICENSE). Licensing model and commercial boundaries: [`LICENSING.md`](LICENSING.md).
