@@ -5,7 +5,7 @@
 
 [package]
 name = "ctxward-desktop"
-version = "0.2.0"
+version = "0.3.0-rc.1"
 edition = "2024"
 description = "Ctxward Desktop — Clash-style transparent LLM-privacy gateway (Tauri shell)"
 license = "Apache-2.0"

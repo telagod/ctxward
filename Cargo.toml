@@ -3,7 +3,7 @@ members = [".", "crates/ctxward-core"]
 
 [package]
 name = "context-gurd"
-version = "0.2.0"
+version = "0.3.0-rc.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Ctxward — a lightweight Rust privacy gateway for LLM traffic. Detection, redaction, reversible tokenization, review queue, OPA + Presidio integration."
@@ -17,7 +17,7 @@ rust-version = "1.85"
 [dependencies]
 # Explicit version (not just path) so cargo-deny's `wildcards = "deny"` does not
 # treat the workspace path dep as a `*` requirement.
-ctxward-core = { path = "crates/ctxward-core", version = "0.2.0" }
+ctxward-core = { path = "crates/ctxward-core", version = "0.3.0-rc.1" }
 aes-gcm-siv = "0.11"
 async-stream = "0.3"
 axum = { version = "0.8", features = ["json", "macros"] }
