@@ -1,412 +1,419 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Ctxward — LLM privacy firewall</title>
-<meta name="description" content="Ctxward detects and redacts PII from every LLM prompt before it leaves your machine. Transparent desktop client + reverse-proxy gateway. Rust, open-source, Apache-2.0."/>
-<meta property="og:title" content="Ctxward — LLM privacy firewall"/>
-<meta property="og:description" content="Every prompt scanned, redacted and tokenized before it reaches the model. No SDK changes."/>
+<title>Ctxward — LLM 隐私防火墙 | Privacy Firewall for LLM Traffic</title>
+<meta name="description" content="Ctxward 在每条 LLM prompt 离开你的机器之前，自动检测、脱敏、可逆加密 PII。透明桌面客户端 + 反向代理网关。Rust，开源，Apache-2.0。"/>
+<meta property="og:title" content="Ctxward — LLM 隐私防火墙"/>
+<meta property="og:description" content="Detect → Redact → Tokenize → Review → Forward. 一核两壳，出门前清洗。"/>
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://telagod.github.io/ctxward/"/>
-<meta name="theme-color" content="#06080d"/>
+<meta name="theme-color" content="#08090e"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#06080d;--bg2:#0a0e17;--bg3:#0e1320;
-  --surf:#111827;--surf2:#151c2e;--surf3:#1a2236;
-  --brd:#1e2740;--brd2:#283352;
-  --fg:#e8ecf4;--fg2:#c4cad9;--mt:#7b88a4;--ft:#5a6580;
-  --bl:#3b82f6;--bl2:#60a5fa;--bl3:#93c5fd;--blg:rgba(59,130,246,.12);
-  --vi:#8b5cf6;--vi2:#a78bfa;--vig:rgba(139,92,246,.10);
-  --gn:#22c55e;--gn2:#4ade80;--gng:rgba(34,197,94,.10);
-  --am:#f59e0b;--rd:#ef4444;
-  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  --bg:#08090e;--bg2:#0b0d14;--bg3:#0f111a;
+  --sf:#12151f;--sf2:#161a27;--sf3:#1b2030;
+  --bd:#1f2436;--bd2:#2a3148;--bd3:#353d58;
+  --fg:#d8dce8;--fg2:#bcc2d4;--mt:#8690aa;--ft:#606980;
+  --ac:#6ea8fe;--ac2:#89b8ff;--acg:rgba(110,168,254,.08);
+  --vi:#9b8afb;--vi2:#b4a7fc;--vig:rgba(155,138,251,.07);
+  --gn:#4ade80;--gng:rgba(74,222,128,.07);
+  --am:#fbbf24;--rd:#f87171;
+  /* 金属渐变 */
+  --met:linear-gradient(135deg,#c0c8d8 0%,#8892a8 25%,#d0d6e2 50%,#9aa2b8 75%,#c8ceda 100%);
+  --met-s:linear-gradient(135deg,#707890 0%,#a0a8b8 40%,#808898 60%,#b0b8c8 100%);
+  --mn:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --sn:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
 }
 @media(prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
-body{font:16px/1.65 var(--sans);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden}
-a{color:var(--bl2);text-decoration:none}a:hover{text-decoration:underline}
-.w{max-width:1080px;margin:0 auto;padding:0 24px}
-.mono{font-family:var(--mono)}
+body{font:15px/1.7 var(--sn);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--ac);text-decoration:none}a:hover{color:var(--ac2)}
+.w{max-width:1060px;margin:0 auto;padding:0 24px}
+.mn{font-family:var(--mn)}
+svg{display:block}
 
-/* ═══ NAV ═══ */
-nav{position:sticky;top:0;z-index:90;background:rgba(6,8,13,.82);backdrop-filter:blur(16px);border-bottom:1px solid var(--brd);padding:0 24px}
-nav .inner{max-width:1080px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:56px}
-nav .logo{font-weight:800;font-size:18px;letter-spacing:-.03em;color:var(--fg)}
-nav .logo span{color:var(--bl)}
-nav .links{display:flex;gap:28px;font-size:14px;font-weight:500;color:var(--mt)}
-nav .links a{color:inherit}nav .links a:hover{color:var(--fg);text-decoration:none}
-.gh-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;background:var(--surf2);border:1px solid var(--brd2);color:var(--fg);transition:background .15s}
-.gh-btn:hover{background:var(--surf3);text-decoration:none}
-.gh-btn svg{width:16px;height:16px;fill:currentColor}
+/* === 金属图标容器 === */
+.ic-m{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--sf2);border:1px solid var(--bd2);position:relative;overflow:hidden}
+.ic-m::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.06) 0%,transparent 50%,rgba(0,0,0,.08) 100%);pointer-events:none}
+.ic-m svg{width:22px;height:22px;stroke-width:1.5;fill:none;stroke:var(--mt);position:relative}
 
-/* ═══ HERO ═══ */
-.hero{position:relative;padding:100px 0 80px;overflow:hidden}
-.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:1000px;height:700px;background:radial-gradient(ellipse,rgba(59,130,246,.10) 0%,rgba(139,92,246,.06) 40%,transparent 70%);pointer-events:none}
-.hero .w{position:relative;text-align:center}
-.hero .pill{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;border:1px solid var(--brd2);background:var(--surf);font-size:12px;font-weight:600;color:var(--mt);margin-bottom:28px;letter-spacing:.02em}
-.hero .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--gn);box-shadow:0 0 8px var(--gn)}
-.hero h1{font-size:clamp(36px,6vw,64px);font-weight:800;line-height:1.08;letter-spacing:-.035em;margin-bottom:20px}
-.hero h1 em{font-style:normal;background:linear-gradient(135deg,var(--bl2),var(--vi2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.hero .sub{font-size:clamp(17px,2.2vw,20px);color:var(--mt);max-width:640px;margin:0 auto 32px;line-height:1.55}
-.hero .pipe{display:inline-flex;align-items:center;gap:0;font-family:var(--mono);font-size:clamp(13px,1.6vw,15px);padding:12px 22px;border-radius:12px;background:var(--surf);border:1px solid var(--brd2);margin-bottom:36px;flex-wrap:wrap;justify-content:center}
-.hero .pipe .step{padding:2px 0;white-space:nowrap}.hero .pipe .arr{color:var(--ft);padding:0 8px}
-.hero .pipe .hl{color:var(--bl2);font-weight:700}
-.ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:24px}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;font-weight:700;font-size:15px;border:1px solid transparent;transition:all .15s}
-.btn-p{background:var(--bl);color:#fff;border-color:var(--bl)}.btn-p:hover{background:#4b90f7;text-decoration:none}
-.btn-s{background:var(--surf);color:var(--fg);border-color:var(--brd2)}.btn-s:hover{background:var(--surf2);text-decoration:none}
-.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.badges img{height:20px}
+/* === NAV === */
+nav{position:sticky;top:0;z-index:90;background:rgba(8,9,14,.88);backdrop-filter:blur(20px) saturate(1.6);border-bottom:1px solid var(--bd);padding:0 24px}
+nav .in{max-width:1060px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:54px}
+.logo{font-weight:800;font-size:17px;letter-spacing:-.04em;background:var(--met);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+nav .lk{display:flex;gap:24px;font-size:13px;font-weight:500;color:var(--ft)}
+nav .lk a{color:inherit;transition:color .15s}nav .lk a:hover{color:var(--fg)}
+.gh{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;color:var(--fg2);background:var(--sf2);border:1px solid var(--bd2);transition:border-color .15s}
+.gh:hover{border-color:var(--bd3);color:var(--fg)}
+.gh svg{width:15px;height:15px;fill:currentColor}
 
-/* ═══ TERMINAL DEMO ═══ */
-.term-wrap{margin:60px auto 0;max-width:720px}
-.term{background:#0c1018;border:1px solid var(--brd2);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.03) inset}
-.term-bar{display:flex;align-items:center;gap:8px;padding:12px 16px;background:var(--surf);border-bottom:1px solid var(--brd)}
-.term-bar i{width:12px;height:12px;border-radius:50%}.term-bar i:nth-child(1){background:#ff5f57}.term-bar i:nth-child(2){background:#febc2e}.term-bar i:nth-child(3){background:#28c840}
-.term-bar span{flex:1;text-align:center;font-size:12px;color:var(--ft);font-family:var(--mono)}
-.term pre{padding:20px;font-size:13px;line-height:1.7;font-family:var(--mono);color:var(--fg2);overflow-x:auto}
-.term .cm{color:#546e8a}.term .pr{color:var(--gn2)}.term .st{color:var(--am)}.term .ky{color:var(--vi2)}.term .rd{color:var(--rd)}.term .bl{color:var(--bl2)}
+/* === HERO === */
+.hero{position:relative;padding:96px 0 72px;text-align:center;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-300px;left:50%;transform:translateX(-50%);width:1200px;height:800px;background:radial-gradient(ellipse,rgba(110,168,254,.06) 0%,rgba(155,138,251,.04) 35%,transparent 65%);pointer-events:none}
+.hero::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:1px;background:linear-gradient(90deg,transparent,var(--bd2),transparent)}
+.hero .w{position:relative}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:5px 16px;border-radius:999px;border:1px solid var(--bd2);background:var(--sf);font-size:11px;font-weight:600;letter-spacing:.03em;color:var(--mt);margin-bottom:32px}
+.pill i{width:5px;height:5px;border-radius:50%;background:var(--gn);box-shadow:0 0 6px rgba(74,222,128,.5)}
+h1{font-size:clamp(32px,5.8vw,58px);font-weight:800;line-height:1.08;letter-spacing:-.04em;margin-bottom:20px}
+h1 em{font-style:normal;background:var(--met);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero .sb{font-size:clamp(15px,2vw,18px);color:var(--mt);max-width:580px;margin:0 auto 14px;line-height:1.6}
+.hero .sb-en{font-size:clamp(13px,1.5vw,15px);color:var(--ft);max-width:540px;margin:0 auto 32px;font-style:italic}
+.pipe{display:inline-flex;align-items:center;gap:0;font-family:var(--mn);font-size:clamp(12px,1.4vw,14px);padding:10px 20px;border-radius:10px;background:var(--sf);border:1px solid var(--bd2);margin-bottom:36px;flex-wrap:wrap;justify-content:center}
+.pipe .s{padding:2px 0;white-space:nowrap;color:var(--mt)}.pipe .a{color:var(--bd3);padding:0 8px}.pipe .h{color:var(--ac);font-weight:700}
+.ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;border-radius:9px;font-weight:700;font-size:14px;border:1px solid transparent;transition:all .15s;letter-spacing:-.01em}
+.btn-p{background:var(--sf2);color:var(--fg);border-color:var(--bd2);position:relative;overflow:hidden}
+.btn-p::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.04) 0%,transparent 50%);pointer-events:none}
+.btn-p:hover{border-color:var(--bd3);background:var(--sf3)}
+.btn-a{background:rgba(110,168,254,.1);color:var(--ac2);border-color:rgba(110,168,254,.2)}.btn-a:hover{background:rgba(110,168,254,.15)}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.badges img{height:18px;opacity:.7}
 
-/* ═══ SECTIONS ═══ */
+/* === TERMINAL === */
+.tw{margin:56px auto 0;max-width:680px}
+.tm{border-radius:14px;overflow:hidden;border:1px solid var(--bd2);background:#090c14;box-shadow:0 24px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.03)}
+.tm-bar{display:flex;align-items:center;gap:7px;padding:11px 16px;background:var(--sf);border-bottom:1px solid var(--bd)}
+.tm-bar i{width:10px;height:10px;border-radius:50%;background:var(--sf3);border:1px solid var(--bd)}
+.tm-bar span{flex:1;text-align:center;font-size:11px;color:var(--ft);font-family:var(--mn)}
+.tm pre{padding:18px 20px;font-size:12.5px;line-height:1.7;font-family:var(--mn);color:var(--fg2);overflow-x:auto;tab-size:2}
+.cm{color:#4a5568}.pr{color:var(--gn)}.st{color:var(--am)}.ky{color:var(--vi2)}.hl{color:var(--ac)}.rd{color:var(--rd)}
+
+/* === SECTIONS === */
 section{padding:80px 0}
-.sec-hd{text-align:center;margin-bottom:48px}
-.sec-hd .ey{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--bl);margin-bottom:12px}
-.sec-hd h2{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;margin-bottom:12px}
-.sec-hd p{color:var(--mt);max-width:600px;margin:0 auto;font-size:17px}
+.shd{text-align:center;margin-bottom:48px}
+.shd .ey{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+.shd .ey-b{color:var(--ac)}.shd .ey-v{color:var(--vi)}.shd .ey-g{color:var(--gn)}
+.shd h2{font-size:clamp(24px,3.8vw,34px);font-weight:800;letter-spacing:-.03em;margin-bottom:10px}
+.shd h2 em{font-style:normal;background:var(--met-s);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.shd p{color:var(--mt);max-width:540px;margin:0 auto;font-size:15px}
+.alt{background:var(--bg2)}.alt2{background:var(--bg3)}
 
-.alt{background:var(--bg2)}
-.alt2{background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%)}
+/* === 五阶段 === */
+.fl{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.fl-s{text-align:center;padding:20px 10px;border-radius:12px;background:var(--sf);border:1px solid var(--bd);position:relative;transition:border-color .2s}
+.fl-s:hover{border-color:var(--bd2)}
+.fl-s .ic-m{margin:0 auto 10px}
+.fl-s .nm{font-weight:700;font-size:13px;margin-bottom:2px}.fl-s .nm-en{font-size:11px;color:var(--ft);margin-bottom:4px}
+.fl-s .ds{font-size:11.5px;color:var(--mt);line-height:1.4}
+.fl-s+.fl-s::before{content:'';position:absolute;left:-5px;top:50%;width:4px;height:1px;background:var(--bd2)}
 
-/* ═══ HOW IT WORKS ═══ */
-.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
-.flow-s{text-align:center;padding:20px 8px;border-radius:12px;background:var(--surf);border:1px solid var(--brd);position:relative}
-.flow-s .ic{font-size:28px;margin-bottom:8px}
-.flow-s .nm{font-weight:700;font-size:14px;margin-bottom:4px}
-.flow-s .ds{font-size:12px;color:var(--mt);line-height:1.4}
-.flow-s::after{content:'\2192';position:absolute;right:-14px;top:50%;transform:translateY(-50%);color:var(--ft);font-size:16px}
-.flow-s:last-child::after{display:none}
+/* === 信任 === */
+.tr-g{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tr-c{padding:28px 22px;border-radius:14px;background:var(--sf);border:1px solid var(--bd);text-align:center;transition:border-color .25s}
+.tr-c:hover{border-color:var(--bd2)}
+.tr-c .ic-m{margin:0 auto 16px;width:48px;height:48px;border-radius:13px}
+.tr-c h3{font-size:15px;font-weight:700;margin-bottom:2px}.tr-c .h3-en{font-size:12px;color:var(--ft);margin-bottom:8px}
+.tr-c p{font-size:13px;color:var(--mt);line-height:1.55}
 
-/* ═══ TRUST MODEL ═══ */
-.trust-g{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.trust-c{padding:24px;border-radius:14px;background:var(--surf);border:1px solid var(--brd);text-align:center;transition:border-color .2s}
-.trust-c:hover{border-color:var(--brd2)}
-.trust-c .ic{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:24px}
-.trust-c:nth-child(1) .ic{background:var(--blg)}.trust-c:nth-child(2) .ic{background:var(--gng)}.trust-c:nth-child(3) .ic{background:var(--vig)}
-.trust-c h3{font-size:16px;font-weight:700;margin-bottom:6px}
-.trust-c p{font-size:13.5px;color:var(--mt);line-height:1.5}
+/* === 架构 === */
+.ar{max-width:660px;margin:0 auto;border-radius:16px;overflow:hidden;border:1px solid var(--bd2);background:var(--sf);box-shadow:0 12px 40px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.03)}
+.ar-core{padding:22px 28px;border-bottom:1px solid var(--bd);text-align:center}
+.ar-core .lb{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--met-s);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.ar-core .cp{font-family:var(--mn);font-size:12px;color:var(--ft);margin-top:6px}
+.ar-sh{display:grid;grid-template-columns:1fr 1fr}
+.ar-s{padding:18px 22px}.ar-s+.ar-s{border-left:1px solid var(--bd)}
+.ar-s h3{font-size:14px;font-weight:700;margin-bottom:1px}.ar-s .h3-en{font-size:11px;color:var(--ft);margin-bottom:6px}
+.ar-s .tg{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle}
+.tg-m{background:rgba(74,222,128,.1);color:var(--gn)}.tg-s{background:rgba(96,105,128,.15);color:var(--ft)}
+.ar-s p{font-size:12.5px;color:var(--mt);line-height:1.5}
 
-/* ═══ ARCHITECTURE ═══ */
-.arch-box{max-width:700px;margin:0 auto;background:var(--surf);border:1px solid var(--brd2);border-radius:16px;overflow:hidden}
-.arch-core{padding:24px 28px;border-bottom:1px solid var(--brd);text-align:center}
-.arch-core .lb{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--bl)}
-.arch-core .caps{font-family:var(--mono);font-size:13px;color:var(--mt);margin-top:8px}
-.arch-shells{display:grid;grid-template-columns:1fr 1fr}
-.arch-sh{padding:20px 24px;position:relative}
-.arch-sh+.arch-sh{border-left:1px solid var(--brd)}
-.arch-sh h3{font-size:15px;font-weight:700;margin-bottom:2px}
-.arch-sh .tg{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 8px;border-radius:999px;margin-left:6px}
-.tg-m{background:rgba(34,197,94,.12);color:var(--gn2)}.tg-s{background:rgba(90,101,128,.15);color:var(--ft)}
-.arch-sh p{font-size:13px;color:var(--mt);margin-top:6px;line-height:1.5}
+/* === 特性 === */
+.ft-g{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.ft-i{padding:20px;border-radius:12px;background:var(--sf);border:1px solid var(--bd);display:flex;gap:14px;align-items:flex-start;transition:border-color .2s}
+.ft-i:hover{border-color:var(--bd2)}
+.ft-i .ic-m{flex-shrink:0}
+.ft-i h3{font-size:14px;font-weight:700;margin-bottom:1px}.ft-i .h3-en{font-size:11px;color:var(--ft);margin-bottom:4px}
+.ft-i p{font-size:12.5px;color:var(--mt);line-height:1.5}
 
-/* ═══ FEATURES GRID ═══ */
-.feat-g{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-.feat-i{padding:20px 22px;border-radius:12px;background:var(--surf);border:1px solid var(--brd);transition:border-color .2s}
-.feat-i:hover{border-color:var(--brd2)}
-.feat-i .ic{font-size:20px;margin-bottom:10px}
-.feat-i h3{font-size:15px;font-weight:700;margin-bottom:4px}
-.feat-i p{font-size:13.5px;color:var(--mt);line-height:1.5}
+/* === 进度 === */
+.pb{max-width:560px;margin:0 auto 40px}
+.pb-r{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.pb-r .l{font-weight:700;font-size:14px}.pb-r .v{font-family:var(--mn);font-weight:700;font-size:13px}
+.pb-t{height:6px;border-radius:99px;background:var(--sf3);overflow:hidden;margin-bottom:4px}
+.pb-f{height:100%;border-radius:99px}
 
-/* ═══ PROGRESS ═══ */
-.prog-bar{max-width:600px;margin:0 auto 40px}
-.pb-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-.pb-row .lb{font-weight:700;font-size:15px}
-.pb-row .vl{font-family:var(--mono);font-weight:700;font-size:14px}
-.pb-track{height:8px;border-radius:99px;background:var(--surf3);overflow:hidden;margin-bottom:6px}
-.pb-fill{height:100%;border-radius:99px}
+.ml-g{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.ml{padding:14px 16px;border-radius:10px;background:var(--sf);border:1px solid var(--bd);border-left:3px solid var(--bd)}
+.ml.d{border-left-color:var(--gn)}.ml.b{border-left-color:var(--ac)}.ml.p{border-left-color:var(--am)}
+.ml .tp{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.ml .nm{font-weight:700;font-size:13px}
+.ml .st{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.st-d{color:var(--gn)}.st-b{color:var(--ac)}.st-p{color:var(--am)}
+.ml p{font-size:12px;color:var(--mt);line-height:1.45}
+.ml .lk{margin-top:4px;font-size:11px;font-family:var(--mn)}.ml .lk a{color:var(--ft)}
 
-.mile-g{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.mile{padding:16px 18px;border-radius:12px;background:var(--surf);border:1px solid var(--brd);border-left:3px solid var(--brd)}
-.mile.d{border-left-color:var(--gn)}.mile.b{border-left-color:var(--bl)}.mile.p{border-left-color:var(--am)}
-.mile .tp{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.mile .nm{font-weight:700;font-size:14px}
-.mile .st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
-.st-d{color:var(--gn)}.st-b{color:var(--bl)}.st-p{color:var(--am)}
-.mile p{font-size:13px;color:var(--mt);line-height:1.45}
-.mile .pr{margin-top:6px;font-size:12px;font-family:var(--mono)}.mile .pr a{color:var(--ft)}
+/* === 下载 === */
+.dl-g{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+.dl-c{text-align:center;padding:28px 18px;border-radius:14px;background:var(--sf);border:1px solid var(--bd);transition:border-color .25s}
+.dl-c:hover{border-color:var(--ac)}
+.dl-c .os-ic{margin:0 auto 14px}
+.dl-c .os-ic svg{width:36px;height:36px;stroke:none;fill:var(--mt);margin:0 auto}
+.dl-c h3{font-size:15px;font-weight:700;margin-bottom:3px}
+.dl-c .sz{font-size:11px;color:var(--ft);font-family:var(--mn);margin-bottom:10px}
+.dl-c .cmd{font-size:12px;color:var(--mt);line-height:1.5}
+.dl-c code{font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;font-family:var(--mn)}
+.dl-nt{text-align:center;max-width:560px;margin:0 auto;font-size:13px;color:var(--mt);padding:16px 20px;border-radius:12px;background:var(--sf);border:1px solid var(--bd)}
+.dl-nt b{color:var(--fg2)}
 
-/* ═══ DOWNLOAD ═══ */
-.dl-g{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
-.dl-c{text-align:center;padding:28px 20px;border-radius:14px;background:var(--surf);border:1px solid var(--brd);transition:border-color .2s}
-.dl-c:hover{border-color:var(--bl)}
-.dl-c .os{font-size:32px;margin-bottom:12px}
-.dl-c h3{font-size:16px;font-weight:700;margin-bottom:4px}
-.dl-c .fs{font-size:12px;color:var(--ft);font-family:var(--mono);margin-bottom:10px}
-.dl-c .files{font-size:13px;color:var(--mt);line-height:1.6}
-.dl-c code{font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px;font-family:var(--mono)}
-.dl-note{text-align:center;max-width:600px;margin:0 auto;font-size:14px;color:var(--mt);padding:18px 22px;border-radius:12px;background:var(--surf);border:1px solid var(--brd)}
-.dl-note b{color:var(--fg)}
+/* === FOOTER === */
+footer{padding:48px 0 56px;border-top:1px solid var(--bd)}
+footer .in{display:flex;justify-content:space-between;gap:36px;flex-wrap:wrap}
+footer .col h4{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ft);margin-bottom:10px}
+footer .col a{display:block;font-size:13px;color:var(--ft);margin-bottom:5px;transition:color .15s}footer .col a:hover{color:var(--fg)}
+footer .cp{margin-top:32px;font-size:11px;color:var(--ft);line-height:1.65;max-width:660px}
 
-/* ═══ FOOTER ═══ */
-footer{padding:48px 0 64px;border-top:1px solid var(--brd)}
-footer .inner{display:flex;justify-content:space-between;align-items:flex-start;gap:40px;flex-wrap:wrap}
-footer .col h4{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mt);margin-bottom:12px}
-footer .col a{display:block;font-size:14px;color:var(--ft);margin-bottom:6px}footer .col a:hover{color:var(--fg)}
-footer .copy{margin-top:36px;font-size:12px;color:var(--ft);line-height:1.6;max-width:700px}
-
-/* ═══ RESPONSIVE ═══ */
 @media(max-width:768px){
-  .flow{grid-template-columns:1fr;gap:10px}.flow-s::after{display:none}
-  .trust-g,.feat-g,.mile-g{grid-template-columns:1fr}
-  .dl-g{grid-template-columns:1fr}
-  .arch-shells{grid-template-columns:1fr}.arch-sh+.arch-sh{border-left:0;border-top:1px solid var(--brd)}
-  nav .links{display:none}
-  footer .inner{flex-direction:column;gap:24px}
+  .fl{grid-template-columns:1fr 1fr;gap:8px}.fl-s:nth-child(5){grid-column:span 2}.fl-s+.fl-s::before{display:none}
+  .tr-g,.ft-g,.ml-g,.dl-g{grid-template-columns:1fr}
+  .ar-sh{grid-template-columns:1fr}.ar-s+.ar-s{border-left:0;border-top:1px solid var(--bd)}
+  nav .lk{display:none}footer .in{flex-direction:column;gap:20px}
 }
 </style>
 </head>
 <body>
 
-<nav><div class="inner">
-  <div class="logo">ctx<span>ward</span></div>
-  <div class="links">
-    <a href="#how">How it works</a>
-    <a href="#trust">Trust model</a>
-    <a href="#features">Features</a>
-    <a href="#progress">Progress</a>
-    <a href="#download">Download</a>
+<!-- SVG sprite (hidden) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M2 7V2h5M17 2h5v5M22 17v5h-5M7 22H2v-5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="4"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5.25-3.44 9.74-8 11-4.56-1.26-8-5.75-8-11V6l8-4z" stroke-linejoin="round"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" stroke-linejoin="round"/><path d="M7 11V7a5 5 0 0110 0v4" stroke-linecap="round"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 4L12 14.01l-3-3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10" stroke-linejoin="round"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke-linecap="round"/></symbol>
+  <symbol id="i-bar" viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" stroke-linejoin="round"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-linux" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="currentColor" stroke="none"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="#08090e" stroke-width="1.5" stroke-linecap="round" fill="none"/><circle cx="9" cy="10" r="1.2" fill="#08090e"/><circle cx="15" cy="10" r="1.2" fill="#08090e"/></symbol>
+  <symbol id="i-apple" viewBox="0 0 24 24"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.81-1.31.05-2.3-1.32-3.14-2.53C4.25 16.76 3 13.06 4.78 10.55a4.74 4.74 0 014-2.05c1.3-.03 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.33 2.83zM13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-win" viewBox="0 0 24 24"><path d="M3 12.5h8v8.5L3 19.5zm0-9L11 2v8.5H3zm10 0L21 2v8.5H13zm0 9h8V21l-8-1.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-gh" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" fill="currentColor"/></symbol>
+</svg>
+
+<nav><div class="in">
+  <div class="logo">ctxward</div>
+  <div class="lk">
+    <a href="#how">工作原理</a>
+    <a href="#trust">信任模型</a>
+    <a href="#features">能力</a>
+    <a href="#progress">进度</a>
+    <a href="#download">下载</a>
   </div>
-  <a class="gh-btn" href="https://github.com/telagod/ctxward">
-    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-    Star
-  </a>
+  <a class="gh" href="https://github.com/telagod/ctxward"><svg viewBox="0 0 16 16"><use href="#i-gh"/></svg> GitHub</a>
 </div></nav>
 
-<!-- ═══════════ HERO ═══════════ -->
-<div class="hero">
-  <div class="w">
-    <div class="pill"><i class="dot" style="width:6px;height:6px;border-radius:50%;background:var(--gn);box-shadow:0 0 8px var(--gn)"></i> Open-source &middot; Rust &middot; Apache-2.0</div>
-    <h1>Your LLM prompts,<br/><em>cleaned before they leave.</em></h1>
-    <p class="sub">Ctxward sits between your apps and every LLM provider &mdash; detecting, redacting and tokenizing PII, secrets and internal identifiers from prompts <strong>before they hit the wire</strong>. No SDK changes. The model never sees the raw data.</p>
-    <div class="pipe">
-      <span class="step">Detect</span><span class="arr">&rarr;</span>
-      <span class="step hl">Redact</span><span class="arr">&rarr;</span>
-      <span class="step hl">Tokenize</span><span class="arr">&rarr;</span>
-      <span class="step">Review</span><span class="arr">&rarr;</span>
-      <span class="step">Forward</span>
-    </div>
-    <div class="ctas">
-      <a class="btn btn-p" href="https://github.com/telagod/ctxward">View on GitHub</a>
-      <a class="btn btn-s" href="#download">Download pre-release</a>
-    </div>
-    <div class="badges">
-      <a href="https://github.com/telagod/ctxward/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/telagod/ctxward/actions/workflows/ci.yml/badge.svg"/></a>
-      <a href="https://github.com/telagod/ctxward/actions/workflows/security.yml"><img alt="security" src="https://github.com/telagod/ctxward/actions/workflows/security.yml/badge.svg"/></a>
-      <img alt="license" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"/>
-    </div>
-
-    <div class="term-wrap"><div class="term">
-      <div class="term-bar"><i></i><i></i><i></i><span>curl &mdash; prompt with PII</span></div>
-      <pre><span class="cm"># You send this:</span>
+<!-- ══ HERO ══ -->
+<div class="hero"><div class="w">
+  <div class="pill"><i></i> Open-source &middot; Rust &middot; Apache-2.0</div>
+  <h1>LLM prompt<br/><em>出门前，先清洗。</em></h1>
+  <p class="sb">Ctxward 坐在你的应用和每一个 LLM 提供商之间，自动检测、脱敏、可逆加密 prompt 中的 PII、密钥和内部标识符。无需改代码，模型永远看不到原始数据。</p>
+  <p class="sb-en">Every prompt scanned, redacted and tokenized before it hits the wire. No SDK changes. The model never sees the raw data.</p>
+  <div class="pipe">
+    <span class="s">Detect</span><span class="a">&rarr;</span>
+    <span class="s h">Redact</span><span class="a">&rarr;</span>
+    <span class="s h">Tokenize</span><span class="a">&rarr;</span>
+    <span class="s">Review</span><span class="a">&rarr;</span>
+    <span class="s">Forward</span>
+  </div>
+  <div class="ctas">
+    <a class="btn btn-p" href="https://github.com/telagod/ctxward">View on GitHub</a>
+    <a class="btn btn-a" href="#download">下载预发布</a>
+  </div>
+  <div class="badges">
+    <a href="https://github.com/telagod/ctxward/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/telagod/ctxward/actions/workflows/ci.yml/badge.svg"/></a>
+    <a href="https://github.com/telagod/ctxward/actions/workflows/security.yml"><img alt="security" src="https://github.com/telagod/ctxward/actions/workflows/security.yml/badge.svg"/></a>
+    <img alt="license" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"/>
+  </div>
+  <div class="tw"><div class="tm">
+    <div class="tm-bar"><i></i><i></i><i></i><span>curl &mdash; 含 PII 的 prompt</span></div>
+    <pre><span class="cm"># 你发送的原文 Your original request</span>
 <span class="pr">$</span> curl localhost:8080/v1/chat/completions \
   -H <span class="st">'Authorization: Bearer demo-secret'</span> \
   -d <span class="st">'{"messages":[{"role":"user",
-       "content":"Contact me: <span class="rd">zhang@corp.example</span>, phone <span class="rd">13812341234</span>"}]}'</span>
+       "content":"联系我: <span class="rd">zhang@corp.example</span>, 手机 <span class="rd">13812341234</span>"}]}'</span>
 
-<span class="cm"># The upstream LLM sees:</span>
-<span class="ky">"content"</span>: <span class="st">"Contact me: <span class="bl">[EMAIL_TOKEN:CGT1.a8f2...]</span>, phone <span class="bl">[REDACTED]</span>"</span>
+<span class="cm"># 上游 LLM 看到的 What the upstream LLM sees</span>
+<span class="ky">"content"</span>: <span class="st">"联系我: <span class="hl">[EMAIL_TOKEN:CGT1.a8f2...]</span>, 手机 <span class="hl">[REDACTED]</span>"</span>
 
-<span class="cm"># Your audit log records hashes + labels, never raw PII.</span></pre>
-    </div></div>
+<span class="cm"># 审计日志只记录 hash + label，永不记录原文</span></pre>
+  </div></div>
+</div></div>
+
+<!-- ══ HOW ══ -->
+<section id="how" class="alt">
+<div class="w">
+  <div class="shd">
+    <div class="ey ey-b">PIPELINE / 工作原理</div>
+    <h2>五道工序，<em>零代码改动</em></h2>
+    <p>Ctxward 是透明代理。设置系统代理指向它，所有 LLM 请求自动经过脱敏管线。</p>
+  </div>
+  <div class="fl">
+    <div class="fl-s"><div class="ic-m"><svg><use href="#i-scan"/></svg></div><div class="nm">检测</div><div class="nm-en">Detect</div><div class="ds">Regex / 熵检测 / Presidio，递归扫描 JSON、SSE、OOXML、PDF</div></div>
+    <div class="fl-s"><div class="ic-m"><svg><use href="#i-shield"/></svg></div><div class="nm">脱敏</div><div class="nm-en">Redact</div><div class="ds">就地脱敏 PII，模型永远看不到原始值</div></div>
+    <div class="fl-s"><div class="ic-m"><svg><use href="#i-key"/></svg></div><div class="nm">可逆加密</div><div class="nm-en">Tokenize</div><div class="ds">AES-GCM-SIV 可逆 token，管理员可恢复，模型不可</div></div>
+    <div class="fl-s"><div class="ic-m"><svg><use href="#i-clip"/></svg></div><div class="nm">人工审批</div><div class="nm-en">Review</div><div class="ds">敏感 prompt 排队等人工审批后再转发</div></div>
+    <div class="fl-s"><div class="ic-m"><svg><use href="#i-check"/></svg></div><div class="nm">转发</div><div class="nm-en">Forward</div><div class="ds">清洗后的请求发往 LLM，响应可选择再次过滤</div></div>
   </div>
 </div>
-
-<!-- ═══════════ HOW IT WORKS ═══════════ -->
-<section id="how" class="alt">
-  <div class="w">
-    <div class="sec-hd">
-      <div class="ey">How it works</div>
-      <h2>Five stages, zero code changes</h2>
-      <p>Ctxward is a transparent proxy. Point your system proxy at it, and every LLM request passes through the pipeline automatically.</p>
-    </div>
-    <div class="flow">
-      <div class="flow-s"><div class="ic">&#x1F50D;</div><div class="nm">Detect</div><div class="ds">Regex, entropy, Presidio &mdash; recursive scan across JSON, SSE, OOXML, PDF</div></div>
-      <div class="flow-s"><div class="ic">&#x1F6E1;</div><div class="nm">Redact</div><div class="ds">Strip PII in-place. The model never sees the original value.</div></div>
-      <div class="flow-s"><div class="ic">&#x1F511;</div><div class="nm">Tokenize</div><div class="ds">Reversible AES-GCM-SIV tokens. Admins can recover; the model cannot.</div></div>
-      <div class="flow-s"><div class="ic">&#x1F4CB;</div><div class="nm">Review</div><div class="ds">Sensitive prompts queue for human approval before forwarding.</div></div>
-      <div class="flow-s"><div class="ic">&#x2705;</div><div class="nm">Forward</div><div class="ds">Clean request goes to the LLM. Response optionally re-filtered.</div></div>
-    </div>
-  </div>
 </section>
 
-<!-- ═══════════ TRUST MODEL ═══════════ -->
+<!-- ══ TRUST ══ -->
 <section id="trust">
-  <div class="w">
-    <div class="sec-hd">
-      <div class="ey">Trust model</div>
-      <h2>A privacy tool you can't inspect is a backdoor</h2>
-      <p>Ctxward earns trust through transparency, not secrecy.</p>
+<div class="w">
+  <div class="shd">
+    <div class="ey ey-v">TRUST MODEL / 信任模型</div>
+    <h2>不可审计的隐私工具，<em>就是后门</em></h2>
+    <p>Ctxward 靠透明赢得信任，而非靠隐秘。</p>
+  </div>
+  <div class="tr-g">
+    <div class="tr-c">
+      <div class="ic-m"><svg><use href="#i-lock"/></svg></div>
+      <h3>白名单 MITM</h3><div class="h3-en">Whitelist-only decryption</div>
+      <p>TLS 解密仅限已知 LLM 提供商 SNI。其余连接全部透传，你完全控制名单。</p>
     </div>
-    <div class="trust-g">
-      <div class="trust-c">
-        <div class="ic">&#x1F512;</div>
-        <h3>Whitelist-only MITM</h3>
-        <p>TLS decryption is restricted to known LLM provider SNIs. Every other connection passes through untouched. You control the list.</p>
-      </div>
-      <div class="trust-c">
-        <div class="ic">&#x1F5DD;</div>
-        <h3>Key never leaves</h3>
-        <p>The root CA private key is generated locally, stored with 0600 permissions, and never exported, uploaded, or logged. Period.</p>
-      </div>
-      <div class="trust-c">
-        <div class="ic">&#x1F4D6;</div>
-        <h3>Fully auditable</h3>
-        <p>Apache-2.0 licensed Rust. Every detection rule, every policy decision, every line of MITM logic is open to inspection.</p>
-      </div>
+    <div class="tr-c">
+      <div class="ic-m"><svg><use href="#i-key"/></svg></div>
+      <h3>密钥永不出机</h3><div class="h3-en">Key never leaves</div>
+      <p>根 CA 私钥本地生成，0600 权限存储，永不导出、上传或记录日志。</p>
+    </div>
+    <div class="tr-c">
+      <div class="ic-m"><svg><use href="#i-eye"/></svg></div>
+      <h3>完全可审计</h3><div class="h3-en">Fully auditable</div>
+      <p>Apache-2.0 开源 Rust。每条检测规则、每个策略决策、每行 MITM 逻辑都可检视。</p>
     </div>
   </div>
+</div>
 </section>
 
-<!-- ═══════════ ARCHITECTURE ═══════════ -->
+<!-- ══ ARCH ══ -->
 <section class="alt2">
-  <div class="w">
-    <div class="sec-hd">
-      <div class="ey">Architecture</div>
-      <h2>One core, two shells</h2>
-      <p>A mature Rust engine is the single source of truth. Two delivery shells sit on top &mdash; same policy, same labels, same audit format.</p>
+<div class="w">
+  <div class="shd">
+    <div class="ey ey-b">ARCHITECTURE / 架构</div>
+    <h2>一核两壳，<em>同源同策</em></h2>
+    <p>成熟的 Rust 引擎是单一事实源。两副交付壳共享同一套策略、标签与审计格式。</p>
+  </div>
+  <div class="ar">
+    <div class="ar-core">
+      <div class="lb">CTXWARD CORE &mdash; RUST ENGINE</div>
+      <div class="cp">detect &middot; redact &middot; tokenize &middot; review &middot; policy &middot; audit &middot; OPA &middot; session &middot; attachments &middot; SSE</div>
     </div>
-    <div class="arch-box">
-      <div class="arch-core">
-        <div class="lb">Ctxward Core &mdash; Rust engine</div>
-        <div class="caps">detect &middot; redact &middot; tokenize &middot; review &middot; policy &middot; audit &middot; OPA &middot; session &middot; attachments &middot; SSE</div>
+    <div class="ar-sh">
+      <div class="ar-s">
+        <h3>桌面端<span class="tg tg-m">主线 main</span></h3>
+        <div class="h3-en">Desktop — transparent take-over</div>
+        <p>Clash 式透明接管。Tauri 壳、系统代理、本地根 CA。单用户。开源增长引擎。</p>
       </div>
-      <div class="arch-shells">
-        <div class="arch-sh">
-          <h3>Desktop<span class="tg tg-m">main</span></h3>
-          <p>Clash-style transparent take-over. Tauri shell, system proxy, local root CA. Single-user. The open-source growth engine.</p>
-        </div>
-        <div class="arch-sh">
-          <h3>Gateway<span class="tg tg-s">secondary</span></h3>
-          <p>Headless reverse proxy. Multi-tenant per-Bearer. Kubernetes-ready. The enterprise monetization line.</p>
-        </div>
+      <div class="ar-s">
+        <h3>网关<span class="tg tg-s">次线 secondary</span></h3>
+        <div class="h3-en">Gateway — reverse proxy</div>
+        <p>无头反向代理。多租户 per-Bearer。Kubernetes 就绪。企业变现线。</p>
       </div>
     </div>
   </div>
+</div>
 </section>
 
-<!-- ═══════════ FEATURES ═══════════ -->
+<!-- ══ FEATURES ══ -->
 <section id="features">
-  <div class="w">
-    <div class="sec-hd">
-      <div class="ey">Engine capabilities</div>
-      <h2>Production-ready data plane</h2>
-      <p>The engine runs today as a reverse proxy. <code style="font-size:14px;background:var(--surf);padding:2px 8px;border-radius:4px">docker compose up</code> and you're live.</p>
-    </div>
-    <div class="feat-g">
-      <div class="feat-i"><div class="ic">&#x1F30D;</div><h3>Language-agnostic</h3><p>Apps stay unchanged. No SDK wrapper, no code changes. Just point at the proxy.</p></div>
-      <div class="feat-i"><div class="ic">&#x1F4C4;</div><h3>Deep format scanning</h3><p>JSON, SSE events, OOXML node-level rewrite (docx/xlsx/pptx), PDF content-stream rewrite, multipart attachments.</p></div>
-      <div class="feat-i"><div class="ic">&#x2696;</div><h3>Five-way decisions</h3><p>allow / redact / tokenize / review / block &mdash; per label, per principal, OPA strict-merge.</p></div>
-      <div class="feat-i"><div class="ic">&#x1F504;</div><h3>Reversible tokenization</h3><p>AES-GCM-SIV in-process. Key from env, never disk. Admins can detokenize; the model cannot.</p></div>
-      <div class="feat-i"><div class="ic">&#x1F517;</div><h3>Session correlation</h3><p>Cross-turn label aggregation defeats split-payload exfiltration across chat turns.</p></div>
-      <div class="feat-i"><div class="ic">&#x1F4CA;</div><h3>Observable</h3><p>Prometheus metrics, /readyz probe, JSONL audit (hashes only, never raw PII), embedded /admin console.</p></div>
-      <div class="feat-i"><div class="ic">&#x26A1;</div><h3>Streaming SSE</h3><p>Per-event redaction with stream-aware fail-safe. Never a mid-stream 502.</p></div>
-      <div class="feat-i"><div class="ic">&#x1F6E1;</div><h3>Supply chain</h3><p>cosign-signed images, CycloneDX SBOM, cargo-deny + cargo-audit + gitleaks in CI.</p></div>
-    </div>
+<div class="w">
+  <div class="shd">
+    <div class="ey ey-g">CAPABILITIES / 引擎能力</div>
+    <h2>数据面，<em>已生产就绪</em></h2>
+    <p>引擎今天就能作为反向代理运行。<code style="font-size:13px;background:var(--sf);padding:2px 8px;border-radius:4px">docker compose up</code></p>
   </div>
+  <div class="ft-g">
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-code"/></svg></div><div><h3>语言无关</h3><div class="h3-en">Language-agnostic</div><p>应用零改动，不需要 SDK 包装。指向代理即生效。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-file"/></svg></div><div><h3>深度格式扫描</h3><div class="h3-en">Deep format scanning</div><p>JSON、SSE、OOXML 节点级重写(docx/xlsx/pptx)、PDF 内容流重写、multipart 附件。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-layers"/></svg></div><div><h3>五路决策</h3><div class="h3-en">Five-way decisions</div><p>allow / redact / tokenize / review / block。按标签、按主体、OPA strict-merge。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-refresh"/></svg></div><div><h3>可逆 Tokenize</h3><div class="h3-en">Reversible tokenization</div><p>进程内 AES-GCM-SIV。密钥来自环境变量，永不落盘。管理员可解密；模型不可。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-link"/></svg></div><div><h3>会话关联</h3><div class="h3-en">Session correlation</div><p>跨对话轮次标签聚合，阻断拆分载荷渗出(split-payload exfil)。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-bar"/></svg></div><div><h3>可观测</h3><div class="h3-en">Observable</div><p>Prometheus 指标、/readyz 探针、JSONL 审计(仅 hash)、内嵌 /admin 控制台。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-zap"/></svg></div><div><h3>流式 SSE 脱敏</h3><div class="h3-en">Streaming SSE</div><p>逐事件脱敏 + 流感知故障安全。永不产生中流 502。</p></div></div>
+    <div class="ft-i"><div class="ic-m"><svg><use href="#i-box"/></svg></div><div><h3>供应链安全</h3><div class="h3-en">Supply chain</div><p>cosign 签名镜像、CycloneDX SBOM、cargo-deny + cargo-audit + gitleaks CI。</p></div></div>
+  </div>
+</div>
 </section>
 
-<!-- ═══════════ PROGRESS ═══════════ -->
+<!-- ══ PROGRESS ══ -->
 <section id="progress" class="alt">
-  <div class="w">
-    <div class="sec-hd">
-      <div class="ey">Productization</div>
-      <h2>Road to 1.0</h2>
-      <p>Phase 1 scope: Desktop on Win/Mac/Linux + browser extension. Mobile is Phase 2.</p>
-    </div>
-
-    <div class="prog-bar">
-      <div class="pb-row"><span class="lb">Engine &amp; data-plane</span><span class="vl" style="color:var(--gn)">production-ready</span></div>
-      <div class="pb-track"><div class="pb-fill" style="width:100%;background:linear-gradient(90deg,var(--gn),var(--gn2))"></div></div>
-      <div class="pb-row" style="margin-top:14px"><span class="lb">Desktop client</span><span class="vl" style="color:var(--am)">feature-complete &middot; pre-release</span></div>
-      <div class="pb-track"><div class="pb-fill" style="width:82%;background:linear-gradient(90deg,var(--bl),var(--vi))"></div></div>
-    </div>
-
-    <div class="mile-g">
-      <div class="mile d"><div class="tp"><span class="nm">Engine core</span><span class="st st-d">shipped</span></div><p>detect / redact / tokenize / review / policy / audit / OPA. 100+ tests.</p></div>
-      <div class="mile d"><div class="tp"><span class="nm">D1 &middot; MITM proxy</span><span class="st st-d">shipped</span></div><p>CONNECT hijack, per-SNI cert gen, LLM whitelist, adversarially hardened.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/1">#1</a></div></div>
-      <div class="mile d"><div class="tp"><span class="nm">D1.5 &middot; SSE redaction</span><span class="st st-d">shipped</span></div><p>Per-event streaming redaction with fail-safe + tail usage metering.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/4">#4</a></div></div>
-      <div class="mile b"><div class="tp"><span class="nm">D2 &middot; Desktop shell</span><span class="st st-b">built</span></div><p>Tauri tray, proxy lifecycle, CA install, audit feed, .deb/.dmg/.msi installers.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/7">#7</a> <a href="https://github.com/telagod/ctxward/pull/8">#8</a></div></div>
-      <div class="mile b"><div class="tp"><span class="nm">D3 &middot; Browser extension</span><span class="st st-b">scaffold</span></div><p>MV3 fetch/XHR patch, WASM bridge, fail-closed. Not yet in stores.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/6">#6</a></div></div>
-      <div class="mile d"><div class="tp"><span class="nm">D4 &middot; Rule-set + metering</span><span class="st st-d">shipped</span></div><p>ed25519-signed hot-updatable rules (immutable floor) + token/cost counters.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/2">#2</a> <a href="https://github.com/telagod/ctxward/pull/3">#3</a></div></div>
-      <div class="mile d"><div class="tp"><span class="nm">Core extraction</span><span class="st st-d">shipped</span></div><p>ctxward-core crate: pure engine, compiles to wasm32. Zero import churn.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/5">#5</a></div></div>
-      <div class="mile d"><div class="tp"><span class="nm">CI + nightly gate</span><span class="st st-d">shipped</span></div><p>DCO, deny/audit, gitleaks. Nightly regression gate vs warm baseline.</p><div class="pr"><a href="https://github.com/telagod/ctxward/pull/10">#10</a> <a href="https://github.com/telagod/ctxward/pull/13">#13</a></div></div>
-    </div>
+<div class="w">
+  <div class="shd">
+    <div class="ey ey-b">PRODUCTIZATION / 产品化进度</div>
+    <h2>通往 <em>1.0</em> 之路</h2>
+    <p>第一阶段范围: 桌面三端(Win/Mac/Linux) + 浏览器扩展。移动端为第二阶段。</p>
   </div>
+  <div class="pb">
+    <div class="pb-r"><span class="l">引擎 / 数据面 Engine</span><span class="v" style="color:var(--gn)">production-ready</span></div>
+    <div class="pb-t"><div class="pb-f" style="width:100%;background:linear-gradient(90deg,#1a7a3e,var(--gn))"></div></div>
+    <div class="pb-r" style="margin-top:12px"><span class="l">桌面客户端 Desktop</span><span class="v" style="color:var(--am)">feature-complete &middot; pre-release</span></div>
+    <div class="pb-t"><div class="pb-f" style="width:82%;background:linear-gradient(90deg,var(--ac),var(--vi))"></div></div>
+  </div>
+  <div class="ml-g">
+    <div class="ml d"><div class="tp"><span class="nm">引擎核心 Engine</span><span class="st st-d">SHIPPED</span></div><p>detect / redact / tokenize / review / policy / audit / OPA. 100+ tests.</p></div>
+    <div class="ml d"><div class="tp"><span class="nm">D1 &middot; 透明 MITM 代理</span><span class="st st-d">SHIPPED</span></div><p>CONNECT 劫持、per-SNI 签名、LLM 白名单、对抗加固。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/1">#1</a></div></div>
+    <div class="ml d"><div class="tp"><span class="nm">D1.5 &middot; SSE 流式脱敏</span><span class="st st-d">SHIPPED</span></div><p>逐事件流式脱敏 + 故障安全 + 尾部用量计量。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/4">#4</a></div></div>
+    <div class="ml b"><div class="tp"><span class="nm">D2 &middot; 桌面壳 Desktop Shell</span><span class="st st-b">BUILT</span></div><p>Tauri 托盘、代理生命周期、CA 安装、审计流、.deb/.dmg/.msi 安装器。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/7">#7</a> <a href="https://github.com/telagod/ctxward/pull/8">#8</a></div></div>
+    <div class="ml b"><div class="tp"><span class="nm">D3 &middot; 浏览器扩展 Extension</span><span class="st st-b">SCAFFOLD</span></div><p>MV3 fetch/XHR patch + WASM bridge，fail-closed。尚未上架商店。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/6">#6</a></div></div>
+    <div class="ml d"><div class="tp"><span class="nm">D4 &middot; 规则集 + 计量</span><span class="st st-d">SHIPPED</span></div><p>ed25519 签名热更新规则(不可撤地板) + token/成本计数器。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/2">#2</a> <a href="https://github.com/telagod/ctxward/pull/3">#3</a></div></div>
+    <div class="ml d"><div class="tp"><span class="nm">内核抽离 Core Extraction</span><span class="st st-d">SHIPPED</span></div><p>ctxward-core crate: 纯引擎，编译到 wasm32。零 import 改动。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/5">#5</a></div></div>
+    <div class="ml d"><div class="tp"><span class="nm">CI + 夜间性能门禁</span><span class="st st-d">SHIPPED</span></div><p>DCO、deny/audit、gitleaks。夜间回归门禁 vs warm committed baseline。</p><div class="lk"><a href="https://github.com/telagod/ctxward/pull/10">#10</a> <a href="https://github.com/telagod/ctxward/pull/13">#13</a></div></div>
+  </div>
+</div>
 </section>
 
-<!-- ═══════════ DOWNLOAD ═══════════ -->
+<!-- ══ DOWNLOAD ══ -->
 <section id="download">
-  <div class="w">
-    <div class="sec-hd">
-      <div class="ey">Get started</div>
-      <h2>Download the pre-release</h2>
-      <p>Installers are built automatically on every tag. Pick your platform.</p>
+<div class="w">
+  <div class="shd">
+    <div class="ey ey-g">DOWNLOAD / 下载</div>
+    <h2>获取<em>预发布版</em></h2>
+    <p>安装器随每个 tag 自动构建。选择你的平台。</p>
+  </div>
+  <div class="dl-g">
+    <div class="dl-c">
+      <div class="os-ic"><svg viewBox="0 0 24 24"><use href="#i-linux"/></svg></div>
+      <h3>Linux</h3>
+      <div class="sz">.deb ~6 MB &middot; .AppImage ~80 MB</div>
+      <div class="cmd"><code>sudo apt install ./Ctxward_*.deb</code></div>
     </div>
-    <div class="dl-g">
-      <div class="dl-c">
-        <div class="os">&#x1F427;</div>
-        <h3>Linux</h3>
-        <div class="fs">.deb ~6 MB &middot; .AppImage ~80 MB</div>
-        <div class="files"><code>sudo apt install ./Ctxward_*.deb</code></div>
-      </div>
-      <div class="dl-c">
-        <div class="os">&#xF8FF;</div>
-        <h3>macOS</h3>
-        <div class="fs">.dmg ~6 MB (Apple Silicon)</div>
-        <div class="files">Open .dmg, drag to Applications<br/><code style="font-size:11px">xattr -cr /Applications/Ctxward.app</code></div>
-      </div>
-      <div class="dl-c">
-        <div class="os">&#x1FA9F;</div>
-        <h3>Windows</h3>
-        <div class="fs">.msi ~9 MB &middot; .exe ~6 MB</div>
-        <div class="files">Run the installer<br/><span style="font-size:12px;color:var(--ft)">SmartScreen: More info &rarr; Run anyway</span></div>
-      </div>
+    <div class="dl-c">
+      <div class="os-ic"><svg viewBox="0 0 24 24"><use href="#i-apple"/></svg></div>
+      <h3>macOS</h3>
+      <div class="sz">.dmg ~6 MB (Apple Silicon)</div>
+      <div class="cmd">打开 .dmg，拖入 Applications<br/><code style="font-size:10px">xattr -cr /Applications/Ctxward.app</code></div>
     </div>
-    <div style="text-align:center;margin-bottom:20px">
-      <a class="btn btn-p" href="https://github.com/telagod/ctxward/releases">All releases on GitHub</a>
-    </div>
-    <div class="dl-note">
-      <b>Pre-release notice:</b> Installers are not code-signed yet (no Apple Developer ID / Windows Authenticode). Your OS will warn on first launch &mdash; see the <a href="https://github.com/telagod/ctxward/blob/main/desktop/README.md#unsigned-builds-pre-10">workaround instructions</a>. Code signing will be added before GA.
+    <div class="dl-c">
+      <div class="os-ic"><svg viewBox="0 0 24 24"><use href="#i-win"/></svg></div>
+      <h3>Windows</h3>
+      <div class="sz">.msi ~9 MB &middot; .exe ~6 MB</div>
+      <div class="cmd">运行安装器<br/><span style="font-size:11px;color:var(--ft)">SmartScreen: 更多信息 &rarr; 仍要运行</span></div>
     </div>
   </div>
+  <div style="text-align:center;margin-bottom:18px">
+    <a class="btn btn-a" href="https://github.com/telagod/ctxward/releases">All releases on GitHub</a>
+  </div>
+  <div class="dl-nt">
+    <b>Pre-release 说明:</b> 安装器尚未代码签名(无 Apple Developer ID / Windows Authenticode)。首次启动时系统会警告 &mdash; 参见 <a href="https://github.com/telagod/ctxward/blob/main/desktop/README.md#unsigned-builds-pre-10">绕过说明</a>。正式版前会补签。
+  </div>
+</div>
 </section>
 
-<!-- ═══════════ FOOTER ═══════════ -->
 <footer>
-  <div class="w">
-    <div class="inner">
-      <div class="col">
-        <h4>Project</h4>
-        <a href="https://github.com/telagod/ctxward">GitHub</a>
-        <a href="https://github.com/telagod/ctxward/releases">Releases</a>
-        <a href="https://github.com/telagod/ctxward/blob/main/CHANGELOG.md">Changelog</a>
-      </div>
-      <div class="col">
-        <h4>Docs</h4>
-        <a href="https://github.com/telagod/ctxward/blob/main/DESIGN.md">Design &amp; threat model</a>
-        <a href="https://github.com/telagod/ctxward/blob/main/LICENSING.md">Licensing (open-core)</a>
-        <a href="https://github.com/telagod/ctxward/blob/main/docs/proposals/product-shape.md">Product shape</a>
-      </div>
-      <div class="col">
-        <h4>Trust</h4>
-        <a href="https://github.com/telagod/ctxward/blob/main/SECURITY.md">Security</a>
-        <a href="https://github.com/telagod/ctxward/blob/main/PRIVACY.md">Privacy</a>
-        <a href="https://github.com/telagod/ctxward/blob/main/CONTRIBUTING.md">Contributing</a>
-      </div>
-    </div>
-    <p class="copy">Ctxward is Apache-2.0 licensed and pre-1.0. The root CA key is generated locally and never leaves the machine. MITM decryption is restricted to whitelisted LLM SNIs. Everything is open to audit. A privacy tool you can't inspect is just a backdoor.</p>
+<div class="w">
+  <div class="in">
+    <div class="col"><h4>项目 Project</h4><a href="https://github.com/telagod/ctxward">GitHub</a><a href="https://github.com/telagod/ctxward/releases">Releases</a><a href="https://github.com/telagod/ctxward/blob/main/CHANGELOG.md">Changelog</a></div>
+    <div class="col"><h4>文档 Docs</h4><a href="https://github.com/telagod/ctxward/blob/main/DESIGN.md">设计与威胁模型</a><a href="https://github.com/telagod/ctxward/blob/main/LICENSING.md">许可证 (open-core)</a><a href="https://github.com/telagod/ctxward/blob/main/docs/proposals/product-shape.md">产品形态</a></div>
+    <div class="col"><h4>信任 Trust</h4><a href="https://github.com/telagod/ctxward/blob/main/SECURITY.md">安全</a><a href="https://github.com/telagod/ctxward/blob/main/PRIVACY.md">隐私</a><a href="https://github.com/telagod/ctxward/blob/main/CONTRIBUTING.md">贡献指南</a></div>
   </div>
+  <p class="cp">Ctxward 基于 Apache-2.0 许可，pre-1.0 阶段。桌面端的信任模型是承重结构：根 CA 密钥在本地生成且永不出机，MITM 解密仅限白名单 LLM SNI，所有代码开放审计。不可审计的隐私工具，就是后门。</p>
+</div>
 </footer>
 
 </body>
